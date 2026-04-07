@@ -6,23 +6,26 @@ project(LabyrinthEngine VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Disable the broken audio module to fix the UCRT64 link error
+set(SFML_BUILD_AUDIO OFF CACHE BOOL "Disable audio" FORCE)
+
+# Block ImGui-SFML from finding the MSYS2 3.0.2 version
+set(IMGUI_SFML_FIND_SFML OFF CACHE BOOL "Use fetched SFML" FORCE)
+
 include(FetchContent)
 
 # ==========================================
-# 1. Fetch SFML
+# 1. Fetch SFML 2.6.1
 # ==========================================
-message(STATUS "Fetching SFML 2.6.1...")
+message(STATUS "Fetching SFML 2.6.1 (Audio Disabled)...")
 FetchContent_Declare(SFML
     GIT_REPOSITORY https://github.com/SFML/SFML.git
     GIT_TAG 2.6.1
 )
 FetchContent_MakeAvailable(SFML)
 
-# Block ImGui-SFML from finding global MSYS2 versions
-set(IMGUI_SFML_FIND_SFML OFF CACHE BOOL "Use fetched SFML" FORCE)
-
 # ==========================================
-# 2. Fetch Core ImGui (The missing piece!)
+# 2. Fetch Core Dear ImGui 
 # ==========================================
 message(STATUS "Fetching Core Dear ImGui...")
 FetchContent_Declare(imgui
@@ -48,12 +51,20 @@ FetchContent_MakeAvailable(ImGui-SFML)
 # ==========================================
 add_executable(EatMeat src/main.cpp)
 
+# NOTICE: sfml-audio has been removed to allow the engine to compile
 target_link_libraries(EatMeat PRIVATE
     sfml-graphics
     sfml-window
     sfml-system
-    sfml-audio
     ImGui-SFML::ImGui-SFML
 )
 
 target_include_directories(EatMeat PRIVATE src)
+# ==========================================
+# AUTO-COPY DLLs TO EXECUTABLE FOLDER
+# ==========================================
+add_custom_command(TARGET EatMeat POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_BINARY_DIR}/_deps/sfml-build/lib"
+    "$<TARGET_FILE_DIR:EatMeat>"
+)

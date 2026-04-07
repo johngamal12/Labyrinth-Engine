@@ -1,5 +1,13 @@
 # Ignore the CMake build folder
 build/
+bin/
+obj/
 
-# Ignore VS Code settings
-.vscode/
+# Ignore VS Code internal junk, but KEEP the config files
+.vscode/ipch/
+.vscode/browse.vc.db
+.vscode/extension.log
+
+# Ignore compiled executables and DLLs
+*.exe
+*.dll
