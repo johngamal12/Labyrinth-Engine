@@ -1,0 +1,5 @@
+# Ignore the CMake build folder
+build/
+
+# Ignore VS Code settings
+.vscode/
