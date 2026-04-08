@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.15)
 
 project(LabyrinthEngine VERSION 1.0.0 LANGUAGES CXX)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -45,11 +49,13 @@ FetchContent_Declare(ImGui-SFML
 )
 FetchContent_MakeAvailable(ImGui-SFML)
 
-
 # ==========================================
 # ENGINE BUILD INSTRUCTIONS
 # ==========================================
-add_executable(EatMeat src/main.cpp)
+add_executable(EatMeat 
+    src/main.cpp
+    src/MapManager.cpp
+)
 
 # NOTICE: sfml-audio has been removed to allow the engine to compile
 target_link_libraries(EatMeat PRIVATE
@@ -60,11 +66,3 @@ target_link_libraries(EatMeat PRIVATE
 )
 
 target_include_directories(EatMeat PRIVATE src)
-# ==========================================
-# AUTO-COPY DLLs TO EXECUTABLE FOLDER
-# ==========================================
-add_custom_command(TARGET EatMeat POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_BINARY_DIR}/_deps/sfml-build/lib"
-    "$<TARGET_FILE_DIR:EatMeat>"
-)

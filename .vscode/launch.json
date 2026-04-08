@@ -5,6 +5,7 @@
             "name": "Trace Labyrinth Engine",
             "type": "cppdbg",
             "request": "launch",
+            "preLaunchTask": "CMake Build",
             "program": "${workspaceFolder}/build/EatMeat.exe",
             "args": [],
             "stopAtEntry": false,
