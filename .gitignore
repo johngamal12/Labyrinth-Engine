@@ -11,3 +11,8 @@ obj/
 # Ignore compiled executables and DLLs
 *.exe
 *.dll
+
+# Ignore database files
+*.db-journal
+*.db-wal
+*.db-shm
