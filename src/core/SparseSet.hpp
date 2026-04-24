@@ -33,9 +33,11 @@ class SparseSet {
         assert(has(e));                              // check if this entity has that data before we try to delete it 
         size_t index = m_entitytodense[e];           // looks up where the data to be removed is inside the m_data
         Entity lastentity = m_densetoentity.back();  // finds the entity that wons the last piece of data in dense array
+        if(e != lastentity){                         // only swap if the entity to remove is not already the last entity
         m_data[index] = std::move(m_data.back());    // takes the last piece of data in the array and overwrites it on the data to be removed
         m_densetoentity[index] = lastentity;         // updates the reverse map to say the data we just overwrote now benlongs to the last entity
         m_entitytodense[lastentity] = index;         // updates the sparse array to tell it that its data just moved to to the 'index'
+        }
         m_data.pop_back();                           // delets the empty slot at the very end of the array by 1
         m_densetoentity.pop_back();                  // shrinks the reverse map by 1 to match
         m_entitytodense[e] = (size_t)-1;             // it tells that entity that it no longer has that component
@@ -50,7 +52,7 @@ class SparseSet {
     }
 
     bool has(Entity e) const{
-        return m_entitytodense[e] != (size_t)-1 && e < MAX_ENTITIES; // check if that entity has that component 
+        return e < MAX_ENTITIES && m_entitytodense[e] != (size_t)-1; // check if that entity has that component 
 
     }
 

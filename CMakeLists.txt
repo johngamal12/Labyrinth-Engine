@@ -89,6 +89,7 @@ FetchContent_MakeAvailable(sqlite3)
 # ==========================================
 add_executable(EatMeat
     src/main.cpp
+    src/core/Engine.cpp
     # src/core/Registry.cpp
     # src/core/DatabaseManager.cpp
     # src/core/AssetManager.cpp

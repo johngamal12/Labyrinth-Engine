@@ -16,3 +16,6 @@ obj/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Ignore ImGui window layout saving
+imgui.ini
