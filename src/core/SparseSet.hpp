@@ -56,4 +56,9 @@ class SparseSet {
 
     }
 
+    //return the dense array of entities that has that component so we can loop through them
+    const std::vector<Entity>& getentities() const {
+        return m_densetoentity;
+    }
+
 };

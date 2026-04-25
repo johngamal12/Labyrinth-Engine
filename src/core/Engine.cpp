@@ -9,6 +9,15 @@ Engine::Engine(){
     m_window->setFramerateLimit(60);
     // start the stop watch 
     m_deltaClock = std::make_unique<sf::Clock>();
+    m_isrunning = true;
+
+    // create the player entity
+    Entity player = m_registry.createentity();
+    // give it some components
+    m_registry.addComponent(player, CTransform{640.0f, 360.0f});
+    m_registry.addComponent(player, CVelocity{200.0f, 0.0f});
+    m_registry.addComponent(player, CShape{20.0f});
+
 
     std::cout<<"Engine started succefully";
 
@@ -66,8 +75,17 @@ void Engine::sUserInput(){
 // we pass dt to the update function because if for some reason the machine is not good enough to produce 60 fps at least the movement stays the same
 // for example if the fps is 30 and the update depends on the frames it will run in half speed but because it is time dependent it will run less smothly but the same speed
 void Engine::sUpdate(float dt){
-    // code logic later when implement other systems
-    (void)dt; // supress unused warning until systems exist
+    // add velocity to the position to move entities
+    for(Entity e : m_registry.velocities.getentities()){
+        if(!(m_registry.hasComponent<CTransform>(e))) continue;
+
+        auto& entity_transform = m_registry.getComponent<CTransform>(e);
+        auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+        entity_transform.x += entity_velocity.vx * dt;
+        entity_transform.y += entity_velocity.vy * dt;
+
+    }
+    (void)dt; // remove when more systems exist
 }
 
 void Engine::sCleanUp(){
@@ -80,7 +98,26 @@ void Engine::sRender(){
     // first wipe the old frame (black window) to avoid drawing the player in every place he goes to
     m_window->clear(sf::Color::Black);
     // second draw all entities
-    // m_rendersystem->render (when applied)
+    const auto& shapeentities = m_registry.shapes.getentities();
+    for(Entity e : shapeentities){
+        if(!(m_registry.hasComponent<CTransform>(e))) continue;
+
+        auto& entity_shape     = m_registry.getComponent<CShape>(e);
+        auto& entity_transform = m_registry.getComponent<CTransform>(e);
+
+        // create circiul just to represent our player
+        sf::CircleShape circle(entity_shape.radius);
+        // center the circules anchor pinot 
+        circle.setOrigin(entity_shape.radius, entity_shape.radius);
+        // smove the circle to the ecs memory cooardinate
+        circle.setPosition(entity_transform.x, entity_transform.y);
+        // give it a color
+        circle.setFillColor(sf::Color::Green);
+
+        m_window->draw(circle);
+
+    }
+
     // third push the drawn frame to the window 
     m_window->display();
 

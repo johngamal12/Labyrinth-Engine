@@ -4,6 +4,7 @@
 #include "components/Components.hpp"
 #include <queue>
 #include <cassert>
+#include <type_traits> // required for std::is_same_v
 
 class Registry {
     private:
@@ -14,6 +15,9 @@ class Registry {
     public:
         // the registry owns the memory arrays 
         SparseSet<CTransform> transforms;
+        SparseSet<CVelocity> velocities;
+        SparseSet<CShape> shapes;
+
         Entity createentity(){
             if(!m_reusableIDs.empty()){
                 // if there is recycable materials why create new!
@@ -46,6 +50,9 @@ class Registry {
        for(Entity e : m_todestroy){
             //strip the flesh (delete the date from them)
             if(transforms.has(e)) transforms.remove(e);
+            if(velocities.has(e)) velocities.remove(e);
+            if(shapes.has(e)) shapes.remove(e);
+
             // push the clean empty id to the recycling graveyard
             m_reusableIDs.push(e);
 
@@ -53,6 +60,49 @@ class Registry {
        // empty the waiting room for the next frame
        m_todestroy.clear();
 
+    }
+
+    // compoenet managment helpers (clean API for all systems)
+    //these forward to the correct SparseSetusing compile-time constexpr
+    // it has zero run-time cost its nicer to use in systems and more readable
+
+    template <typename T>
+    void addComponent (Entity e,T component){
+        if constexpr (std::is_same_v<T, CTransform>){
+            transforms.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CVelocity>){
+            velocities.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CShape>){
+            shapes.insert(e, std::move(component));
+        } else{
+            static_assert(sizeof(T) == 0, "Unknown component type add it to addComponent template");
+        }
+
+    }
+
+    template <typename T>
+    T& getComponent (Entity e){
+        if constexpr (std::is_same_v<T, CTransform>){
+            return transforms.get(e);
+        } else if constexpr (std::is_same_v<T, CVelocity>){
+            return velocities.get(e);
+        } else if constexpr (std::is_same_v<T, CShape>){
+            return shapes.get(e);
+        } else {
+        static_assert(sizeof(T) == 0, "Unknown component type add it to getComponent template");
+        }
+    }
+
+    template <typename T>
+    bool hasComponent(Entity e) const{
+        if constexpr (std::is_same_v<T, CTransform>){
+            return transforms.has(e);
+        } else if constexpr (std::is_same_v<T, CVelocity>){
+            return velocities.has(e);
+        } else if constexpr (std::is_same_v<T, CShape>){
+            return shapes.has(e);
+        } 
+        return false;
     }
 
 };
