@@ -17,6 +17,7 @@ class Registry {
         SparseSet<CTransform> transforms;
         SparseSet<CVelocity> velocities;
         SparseSet<CShape> shapes;
+        SparseSet<CInput> inputs;
 
         Entity createentity(){
             if(!m_reusableIDs.empty()){
@@ -52,6 +53,7 @@ class Registry {
             if(transforms.has(e)) transforms.remove(e);
             if(velocities.has(e)) velocities.remove(e);
             if(shapes.has(e)) shapes.remove(e);
+            if(inputs.has(e)) inputs.remove(e);
 
             // push the clean empty id to the recycling graveyard
             m_reusableIDs.push(e);
@@ -74,6 +76,8 @@ class Registry {
             velocities.insert(e, std::move(component));
         } else if constexpr (std::is_same_v<T, CShape>){
             shapes.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CInput>){
+            inputs.insert(e, std::move(component));
         } else{
             static_assert(sizeof(T) == 0, "Unknown component type add it to addComponent template");
         }
@@ -88,6 +92,8 @@ class Registry {
             return velocities.get(e);
         } else if constexpr (std::is_same_v<T, CShape>){
             return shapes.get(e);
+        } else if constexpr (std::is_same_v<T, CInput>){
+            return inputs.get(e);
         } else {
         static_assert(sizeof(T) == 0, "Unknown component type add it to getComponent template");
         }
@@ -101,7 +107,9 @@ class Registry {
             return velocities.has(e);
         } else if constexpr (std::is_same_v<T, CShape>){
             return shapes.has(e);
-        } 
+        } else if constexpr (std::is_same_v<T, CInput>){
+            return inputs.has(e);
+        }
         return false;
     }
 

@@ -17,3 +17,11 @@ struct CVelocity{
 struct CShape{
     float radius = 20.0f;
 };
+
+//input component
+struct CInput{
+    bool up = false;
+    bool down = false;
+    bool right = false;
+    bool left = false;
+};

@@ -2,6 +2,8 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 
+#define player_speed 100.0f
+
 Engine::Engine(){
     // first initialize the window once we run the programm
     m_window = std::make_unique<sf::RenderWindow>(sf::VideoMode(1280,720),"game Eat Meat");
@@ -15,8 +17,9 @@ Engine::Engine(){
     Entity player = m_registry.createentity();
     // give it some components
     m_registry.addComponent(player, CTransform{640.0f, 360.0f});
-    m_registry.addComponent(player, CVelocity{200.0f, 0.0f});
+    m_registry.addComponent(player, CVelocity{0.0f, 0.0f});
     m_registry.addComponent(player, CShape{20.0f});
+    m_registry.addComponent(player, CInput{});
 
 
     std::cout<<"Engine started succefully";
@@ -62,11 +65,23 @@ void Engine::sUserInput(){
             // we dont call (m_window->close();) because it is getting destroyed automaticly when the loop stops and the destructor is called and to prevent crashes
 
         }
-        if(event.type == sf::Event::KeyPressed){
-            if(event.key.code == sf::Keyboard::Escape){
-                m_isrunning = false;
+        if(event.type == sf::Event::KeyPressed || event.type == sf::Event::KeyReleased){
+            bool is_pressed = (event.type == sf::Event::KeyPressed);
+
+            for(Entity e : m_registry.inputs.getentities()){
+
+                auto& entity_input = m_registry.getComponent<CInput>(e);
+                if(event.key.code == sf::Keyboard::W) entity_input.up    = is_pressed;
+                if(event.key.code == sf::Keyboard::S) entity_input.down  = is_pressed;
+                if(event.key.code == sf::Keyboard::D) entity_input.right = is_pressed;
+                if(event.key.code == sf::Keyboard::A) entity_input.left  = is_pressed;
+
             }
+            
         }
+        // we keep escape separated from realeased because its cleaner
+        if(event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape)
+            m_isrunning = false;
 
     }
 
@@ -75,6 +90,22 @@ void Engine::sUserInput(){
 // we pass dt to the update function because if for some reason the machine is not good enough to produce 60 fps at least the movement stays the same
 // for example if the fps is 30 and the update depends on the frames it will run in half speed but because it is time dependent it will run less smothly but the same speed
 void Engine::sUpdate(float dt){
+    //translate the wasd keyboard (input) to real movement
+    for(Entity e : m_registry.inputs.getentities()){
+        if(!(m_registry.hasComponent<CVelocity>(e))) continue;
+
+        auto& entity_input    = m_registry.getComponent<CInput>(e);
+        auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+        entity_velocity.vx = 0;
+        entity_velocity.vy = 0;
+        // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
+        // so if we want to move down we actually increase the y value 
+        if(entity_input.up)    entity_velocity.vy -= player_speed;
+        if(entity_input.down)  entity_velocity.vy += player_speed;
+        if(entity_input.right) entity_velocity.vx += player_speed;
+        if(entity_input.left)  entity_velocity.vx -= player_speed;
+
+    }
     // add velocity to the position to move entities
     for(Entity e : m_registry.velocities.getentities()){
         if(!(m_registry.hasComponent<CTransform>(e))) continue;
@@ -85,6 +116,8 @@ void Engine::sUpdate(float dt){
         entity_transform.y += entity_velocity.vy * dt;
 
     }
+
+
     (void)dt; // remove when more systems exist
 }
 
