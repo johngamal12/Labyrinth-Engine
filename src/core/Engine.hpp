@@ -25,8 +25,9 @@ class Engine{
     // the four phases of our loop
     void sUserInput();
     void sUpdate(float dt);
-    void sRender();
+    void sCollision();
     void sCleanUp();
+    void sRender();
 
     public:
         

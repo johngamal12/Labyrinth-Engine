@@ -1,8 +1,10 @@
 #include "Engine.hpp"
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <algorithm> //for std::clamp
+#include <cmath> // for std::abs
 
-#define player_speed 100.0f
+constexpr float player_speed = 200.0f;
 
 Engine::Engine(){
     // first initialize the window once we run the programm
@@ -20,6 +22,14 @@ Engine::Engine(){
     m_registry.addComponent(player, CVelocity{0.0f, 0.0f});
     m_registry.addComponent(player, CShape{20.0f});
     m_registry.addComponent(player, CInput{});
+    m_registry.addComponent(player, CBoundingBox{40.0f, 40.0f});
+
+    // create an enimy to test the AABB on
+    Entity enemy_1 = m_registry.createentity();
+    m_registry.addComponent(enemy_1, CTransform{50.0f,50.0f});
+    m_registry.addComponent(enemy_1, CVelocity{100.0f,250.0f});
+    m_registry.addComponent(enemy_1, CShape{40.0f});
+    m_registry.addComponent(enemy_1, CBoundingBox{80.0f, 80.0f});
 
 
     std::cout<<"Engine started succefully";
@@ -44,6 +54,7 @@ void Engine::run(){
         sUserInput();
         // phase 2 process that input using the logic that is implemented
         sUpdate(dt);
+        sCollision();
         // phase 3 cleanup dead entities before showing in the window
         sCleanUp();
         // phase4 render your current frame to draw it on the window
@@ -105,6 +116,20 @@ void Engine::sUpdate(float dt){
         if(entity_input.right) entity_velocity.vx += player_speed;
         if(entity_input.left)  entity_velocity.vx -= player_speed;
 
+        // if the player moving in diagonal then the magnitude of speed from vx and vy are sqr(vx*2 +vy*2) which is sqr((10000 + 10000)) which is 141 not 100!
+        // check if the player is moving in both the x and y directions
+        if(entity_velocity.vx && entity_velocity.vy){
+            // remember from trignometry unit circle that the xamd y components of 45 degrees are exactly (sqrt(2) / 2) which is a mathematical constant of 0.7071067
+            // we make constexpr to calculate it only once during compilation time
+            constexpr float Diagonal_45_Multiplier = 0.7071067f;
+
+            entity_velocity.vx *= Diagonal_45_Multiplier;
+            entity_velocity.vy *= Diagonal_45_Multiplier;
+            // so this way when we do the math we get diagonal speed of exactly the player speed
+        }
+
+        
+
     }
     // add velocity to the position to move entities
     for(Entity e : m_registry.velocities.getentities()){
@@ -117,9 +142,71 @@ void Engine::sUpdate(float dt){
 
     }
 
-
-    (void)dt; // remove when more systems exist
 }
+
+// our physics systems that give entities their rigid bodies
+void Engine::sCollision(){
+    const auto& entities_with_BB = m_registry.bounding_boxes.getentities();
+    for(Entity e : entities_with_BB){
+        // ensure that entity also has position to draw that bounding-box on
+        if(!m_registry.transforms.has(e)) continue;
+
+        auto& entity_transform = m_registry.getComponent<CTransform>(e);
+        auto& entity_bounding_box = m_registry.getComponent<CBoundingBox>(e);
+
+
+        // that code i wright myself i just discoverd i better way of doing thing so iam letting it commented because i dont want to delete my work :)
+        // // remember that we set the origin of the entity to the center of it
+        // if((entity_transform.x - ( entity_bounding_box.width / 2.0f)) < 0.0f ){
+        //     entity_transform.x = entity_bounding_box.width / 2.0f;
+        // } else if ((entity_transform.x + (entity_bounding_box.width / 2.0f)) > 1280.0f){
+        //     entity_transform.x = 1280.0f - (entity_bounding_box.width / 2.0f);
+        // }
+        // // note that we cannot chain if else with both x and y axis because if we are in the cornor and try to move diagonal 
+        // // only the x axes will get clapped because only one if will be executed and the x comes first
+        // if ((entity_transform.y - (entity_bounding_box.height / 2.0f)) < 0.0f){
+        //     entity_transform.y = entity_bounding_box.height / 2.0f;
+        // } else if ((entity_transform.y +( entity_bounding_box.height / 2.0f)) > 720.0f){
+        //     entity_transform.y = 720.0f - (entity_bounding_box.height / 2.0f);
+        // }
+
+        //here is the potimized function of c++
+        const float half_width  = (entity_bounding_box.width / 2.0f);
+        const float half_height = (entity_bounding_box.height/ 2.0f);
+        entity_transform.x = std::clamp(entity_transform.x, half_width,  1280.0f - half_width);
+        entity_transform.y = std::clamp(entity_transform.y, half_height, 720.0f - half_height);
+
+    }
+    // check for collisions between an entity and other entities
+    for(size_t i = 0; i < entities_with_BB.size(); i++){
+        Entity entity_A = entities_with_BB[i];
+        if(!m_registry.hasComponent<CTransform>(entity_A)) continue;
+
+        auto& ent_A_Tra = m_registry.getComponent<CTransform>(entity_A);
+        auto& ent_A_Box = m_registry.getComponent<CBoundingBox>(entity_A);
+
+        for(size_t j = (i + 1); j < entities_with_BB.size(); j++){
+            Entity entity_B = entities_with_BB[j];
+            if(!m_registry.hasComponent<CTransform>(entity_B)) continue;
+
+            auto& ent_B_Tra = m_registry.getComponent<CTransform>(entity_B);
+            auto& ent_B_Box = m_registry.getComponent<CBoundingBox>(entity_B);
+
+            // getting the real difrence space between the two entities
+            float diff_x = std::abs(ent_A_Tra.x - ent_B_Tra.x);
+            float diff_y = std::abs(ent_A_Tra.y - ent_B_Tra.y);
+            // getting the minimum space if the real space gets smaller than then coliision
+            float dx = ((ent_A_Box.width / 2.0f) + (ent_B_Box.width / 2.0f));
+            float dy = ((ent_A_Box.height / 2.0f) + (ent_B_Box.height / 2.0f));
+
+            if((diff_x < dx) && (diff_y < dy)){
+                std::cout<< "collide!";
+            }
+        }
+    }
+
+}
+
 
 void Engine::sCleanUp(){
     // clean the dead entities that didnot survive the update system logic before sending them to be rendered
@@ -145,7 +232,11 @@ void Engine::sRender(){
         // smove the circle to the ecs memory cooardinate
         circle.setPosition(entity_transform.x, entity_transform.y);
         // give it a color
-        circle.setFillColor(sf::Color::Green);
+        if(m_registry.hasComponent<CInput>(e)){
+            circle.setFillColor(sf::Color::Green);
+        } else {
+            circle.setFillColor(sf::Color::Red);
+        }
 
         m_window->draw(circle);
 

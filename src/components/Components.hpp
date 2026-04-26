@@ -20,8 +20,14 @@ struct CShape{
 
 //input component
 struct CInput{
-    bool up = false;
-    bool down = false;
+    bool up    = false;
+    bool down  = false;
     bool right = false;
-    bool left = false;
+    bool left  = false;
+};
+
+//physical box used for detection detection
+struct CBoundingBox{
+    float width  = 0.0f;
+    float height = 0.0f;
 };
