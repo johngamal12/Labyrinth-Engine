@@ -5,6 +5,8 @@
 #include <cmath> // for std::abs
 
 constexpr float player_speed = 200.0f;
+constexpr float window_x = 1280.0f;
+constexpr float window_y = 720.0f; 
 
 Engine::Engine(){
     // first initialize the window once we run the programm
@@ -173,8 +175,22 @@ void Engine::sCollision(){
         //here is the potimized function of c++
         const float half_width  = (entity_bounding_box.width / 2.0f);
         const float half_height = (entity_bounding_box.height/ 2.0f);
-        entity_transform.x = std::clamp(entity_transform.x, half_width,  1280.0f - half_width);
-        entity_transform.y = std::clamp(entity_transform.y, half_height, 720.0f - half_height);
+
+        // stop entities from getting stuck when they hit the wall (allow for bing bong like mechanics)
+        if(m_registry.hasComponent<CVelocity>(e)){
+            auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+            if(entity_transform.x <= half_width || entity_transform.x >= window_x - half_width){
+                entity_velocity.vx *= -1;
+            } 
+            if(entity_transform.y <= half_height || entity_transform.y >= window_y - half_height){
+                entity_velocity.vy *= -1;
+            }
+
+        }
+
+        // stop entities from getting off the edges
+        entity_transform.x = std::clamp(entity_transform.x, half_width,  window_x - half_width);
+        entity_transform.y = std::clamp(entity_transform.y, half_height, window_y - half_height);
 
     }
     // check for collisions between an entity and other entities
@@ -200,9 +216,41 @@ void Engine::sCollision(){
             float dy = ((ent_A_Box.height / 2.0f) + (ent_B_Box.height / 2.0f));
 
             if((diff_x < dx) && (diff_y < dy)){
+                // function to keep entities far apart
+                float overlap_x = dx - diff_x;
+                float overlap_y = dy - diff_y;
+
+                // to be changed later to not let the ststic bodies move
+                if(overlap_x < overlap_y){
+
+                    float push_value = overlap_x / 2.0f;
+                    if(ent_A_Tra.x < ent_B_Tra.x){
+                        ent_A_Tra.x -= push_value;
+                        ent_B_Tra.x += push_value;
+
+                    } else {
+                        ent_B_Tra.x -= push_value;
+                        ent_A_Tra.x += push_value;
+                    }
+                } else{
+                    float push_value = overlap_y / 2.0f;
+
+                    if(ent_A_Tra.y < ent_B_Tra.y){
+                        ent_A_Tra.y -= push_value;
+                        ent_B_Tra.y += push_value;
+
+                    } else{
+                        ent_B_Tra.y -= push_value;
+                        ent_A_Tra.y += push_value;
+                    }
+
+                }
+
                 std::cout<< "collide!";
             }
+
         }
+
     }
 
 }
