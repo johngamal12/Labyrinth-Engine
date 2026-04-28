@@ -24,6 +24,7 @@ struct CInput{
     bool down  = false;
     bool right = false;
     bool left  = false;
+    bool can_jump = false;
 };
 
 //physical box used for detection detection

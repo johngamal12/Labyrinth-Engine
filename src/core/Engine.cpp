@@ -32,6 +32,10 @@ Engine::Engine(){
     m_registry.addComponent(enemy_1, CBoundingBox{80.0f, 80.0f});
     m_registry.addComponent(enemy_1, CHealth{});
 
+    // create a floor to test the physics
+    Entity floor = m_registry.createentity();
+    m_registry.addComponent(floor, CTransform{620.0f, 700.0f});
+    m_registry.addComponent(floor, CBoundingBox{1280.0f, 40.0f});
 
     std::cout<<"Engine started succefully";
 
@@ -122,31 +126,34 @@ void Engine::sUpdate(float dt){
 
         auto& entity_input    = m_registry.getComponent<CInput>(e);
         auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+        
         constexpr float player_speed = 200.0f;
         entity_velocity.vx = 0;
-        entity_velocity.vy = 0;
-        // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
-        // so if we want to move down we actually increase the y value 
-        if(entity_input.up)    entity_velocity.vy -= player_speed;
-        if(entity_input.down)  entity_velocity.vy += player_speed;
         if(entity_input.right) entity_velocity.vx += player_speed;
         if(entity_input.left)  entity_velocity.vx -= player_speed;
-
-        // if the player moving in diagonal then the magnitude of speed from vx and vy are sqr(vx*2 +vy*2) which is sqr((10000 + 10000)) which is 141 not 100!
-        // check if the player is moving in both the x and y directions
-        if(entity_velocity.vx && entity_velocity.vy){
-            // remember from trignometry unit circle that the xamd y components of 45 degrees are exactly (sqrt(2) / 2) which is a mathematical constant of 0.7071067
-            // we make constexpr to calculate it only once during compilation time
-            constexpr float Diagonal_45_Multiplier = 0.7071067f;
-
-            entity_velocity.vx *= Diagonal_45_Multiplier;
-            entity_velocity.vy *= Diagonal_45_Multiplier;
-            // so this way when we do the math we get diagonal speed of exactly the player speed
+        
+        constexpr float gravity = 980.0f;
+        entity_velocity.vy += gravity * dt;
+        
+        // you dont want to keep accelerating to the level that you bypass the floor
+        constexpr float max_fall_speed =  735.0f;
+        entity_velocity.vy = std::min(entity_velocity.vy, max_fall_speed);
+        
+        // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
+        // so if we want to move down we actually increase the y value 
+        constexpr float jump_power = -980.0f;
+        if(entity_input.up && entity_input.can_jump){
+            entity_velocity.vy    = jump_power;
+            entity_input.can_jump = false;
         }
 
-        
+        //for variable jumb height
+        if(!entity_input.up && entity_velocity.vy < 0.0f){
+            entity_velocity.vy *= 0.5f; // for smooth stop not sudden
+        }
 
     }
+
     // add velocity to the position to move entities
     for(Entity e : m_registry.velocities.getentities()){
         if(!(m_registry.hasComponent<CTransform>(e))) continue;
@@ -231,9 +238,8 @@ void Engine::sCollision(){
             }
 
         }
-
-        // stop entities from getting off the edges
-        entity_transform.x = std::clamp(entity_transform.x, half_width,  window_x - half_width);
+        // we dont need to clamp the x axes
+        // stop entities from getting off the y edges unless you want them to fall to the abyss 
         entity_transform.y = std::clamp(entity_transform.y, half_height, window_y - half_height);
 
     }
@@ -265,32 +271,98 @@ void Engine::sCollision(){
                 float overlap_x = dx - diff_x;
                 float overlap_y = dy - diff_y;
 
-                // to be changed later to not let the ststic bodies move
+                bool a_can_move = m_registry.hasComponent<CVelocity>(entity_A);
+                bool b_can_move = m_registry.hasComponent<CVelocity>(entity_B);
+                // applying logic for making bodies rigid 
+                // (shitest if else chain i have ever done)
                 if(overlap_x < overlap_y){
-
-                    float push_value = overlap_x / 2.0f;
-                    if(ent_A_Tra.x < ent_B_Tra.x){
-                        ent_A_Tra.x -= push_value;
-                        ent_B_Tra.x += push_value;
-
-                    } else {
-                        ent_B_Tra.x -= push_value;
-                        ent_A_Tra.x += push_value;
+                    if(a_can_move && b_can_move)
+                    {
+                        if(a_can_move && b_can_move)
+                        {
+                            float push_value = overlap_x / 2.0f;
+                            if(ent_A_Tra.x < ent_B_Tra.x)
+                            {
+                                ent_A_Tra.x -= push_value;
+                                ent_B_Tra.x += push_value;
+                            } else
+                            {
+                                ent_A_Tra.x += push_value;
+                                ent_B_Tra.x -= push_value;                                
+                            }
+                        } else if(!a_can_move && b_can_move)
+                        {
+                            if(ent_A_Tra.x < ent_B_Tra.x)
+                            {
+                                ent_B_Tra.x += overlap_x;
+                            } else
+                            {
+                                ent_B_Tra.x -= overlap_x;
+                            }
+                        } else if(a_can_move && !b_can_move)
+                        {
+                            if(ent_A_Tra.x < ent_B_Tra.x)
+                            {
+                                ent_B_Tra.x -= overlap_x;
+                            } else
+                            {
+                                ent_B_Tra.x += overlap_x;
+                            }
+                        }
                     }
-                } else{
-                    float push_value = overlap_y / 2.0f;
-
-                    if(ent_A_Tra.y < ent_B_Tra.y){
-                        ent_A_Tra.y -= push_value;
-                        ent_B_Tra.y += push_value;
-
-                    } else{
-                        ent_B_Tra.y -= push_value;
-                        ent_A_Tra.y += push_value;
+                } else
+                { if(a_can_move && b_can_move)
+                    {
+                        float push_value = overlap_y / 2.0f;
+                        if(ent_A_Tra.y < ent_B_Tra.y)
+                        {
+                            ent_A_Tra.y -= push_value;
+                            ent_B_Tra.y += push_value;
+                            if(m_registry.hasComponent<CInput>(entity_A))
+                            {
+                                m_registry.getComponent<CInput>(entity_A).can_jump = true;
+                            }
+                            m_registry.getComponent<CVelocity>(entity_A).vy = 0.0f;
+                        } else 
+                        {
+                            ent_A_Tra.y += push_value;
+                            ent_B_Tra.y -= push_value;
+                            if(m_registry.hasComponent<CInput>(entity_B))
+                            {
+                                m_registry.getComponent<CVelocity>(entity_B).vy = 0.0f;
+                            }
+                        }
+                    } else
+                     if(!a_can_move && b_can_move) 
+                    {
+                        if(ent_A_Tra.y < ent_B_Tra.y)
+                        {
+                        ent_B_Tra.y += overlap_y;
+                        } else
+                        {
+                            ent_B_Tra.y -= overlap_y;  
+                            if(m_registry.hasComponent<CInput>(entity_B))
+                            {
+                                m_registry.getComponent<CInput>(entity_B).can_jump = true;
+                            }
+                            m_registry.getComponent<CVelocity>(entity_B).vy = 0.0f;    
+                        }
+                    } else if(a_can_move && !b_can_move)
+                    {
+                        if(ent_A_Tra.y < ent_B_Tra.y)
+                        {
+                            ent_A_Tra.y -= overlap_y;                        
+                            if(m_registry.hasComponent<CInput>(entity_A))
+                            {
+                                m_registry.getComponent<CInput>(entity_A).can_jump = true ;
+                            }
+                            m_registry.getComponent<CVelocity>(entity_A).vy = 0.0f;
+                        } else
+                        {
+                            ent_A_Tra.y += overlap_y; 
+                        }
                     }
-
                 }
-
                 std::cout<< "collide!";
             }
 
@@ -330,6 +402,21 @@ void Engine::sRender(){
     // the three phases of rendering
     // first wipe the old frame (black window) to avoid drawing the player in every place he goes to
     m_window->clear(sf::Color::Black);
+
+    //spawning the cameraman to foloow our player
+    if(m_registry.hasComponent<CTransform>(m_player)){
+        auto& player_position = m_registry.getComponent<CTransform>(m_player);
+    
+        // get the window's current camera view
+        sf::View camera = m_window->getView();
+
+        //center the camera on the player
+        //360 on y to lock the camera on the y so it doesnot bounce with jumps
+        camera.setCenter(player_position.x, 360.0f);
+
+        m_window->setView(camera);
+    }
+
     // second draw all entities
     const auto& shapeentities = m_registry.shapes.getentities();
     for(Entity e : shapeentities){
@@ -369,11 +456,12 @@ void Engine::sSpawnBullet(Entity creator, float position_mouse_x, float position
     float diff_x = position_mouse_x - creator_transform.x;
     float diff_y = position_mouse_y - creator_transform.y;
 
-    constexpr float bullet_speed = 500.0f;
+
 
     float lenght = std::sqrt(diff_x * diff_x + diff_y * diff_y);
     // multiply the normalized vector by the bullet velocity
     if(lenght > 0.0f){
+        constexpr float bullet_speed = 500.0f;
         float vx = (diff_x / lenght) * bullet_speed;
         float vy = (diff_y / lenght) * bullet_speed;
 
