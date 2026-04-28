@@ -31,3 +31,18 @@ struct CBoundingBox{
     float width  = 0.0f;
     float height = 0.0f;
 };
+
+//seconds until bullets disappear
+struct CLifespan{
+    float life_span = 0.0f;
+};
+
+//damage component
+struct CDamage{
+    float damage = 0.0f;
+};
+
+//hp until death component
+struct CHealth{
+    float health = 100.0f;
+};

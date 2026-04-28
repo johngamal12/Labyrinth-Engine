@@ -10,15 +10,17 @@ namespace sf {
 
 class Engine{
     private:
-        // smart pointer to our sfml window unique pointer means that the engine is the owner of the window so when the engine dies the window automatically destroys (no memory leakes)
-        std::unique_ptr<sf::RenderWindow> m_window;
-        // smart pointer to a stopwatch that measures exactly how long a frame takes
-        std::unique_ptr<sf::Clock> m_deltaClock;
+    // smart pointer to our sfml window unique pointer means that the engine is the owner of the window so when the engine dies the window automatically destroys (no memory leakes)
+    std::unique_ptr<sf::RenderWindow> m_window;
+    // smart pointer to a stopwatch that measures exactly how long a frame takes
+    std::unique_ptr<sf::Clock> m_deltaClock;
 
     // the engine owns the ecs registry 
     Registry m_registry;
     // the condition that keeps our loop spining
     bool m_isrunning = true;
+    // crate the player unique entity
+    Entity m_player;
 
 
 
@@ -28,6 +30,8 @@ class Engine{
     void sCollision();
     void sCleanUp();
     void sRender();
+    void sSpawnBullet(Entity creator, float position_mouse_x, float position_mouse_y);
+    bool isColliding(Entity a, Entity b);
 
     public:
         

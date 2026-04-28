@@ -19,6 +19,9 @@ class Registry {
         SparseSet<CShape> shapes;
         SparseSet<CInput> inputs;
         SparseSet<CBoundingBox> bounding_boxes;
+        SparseSet<CLifespan> lifespans;
+        SparseSet<CDamage> damages;
+        SparseSet<CHealth> healths;
 
         Entity createentity(){
             if(!m_reusableIDs.empty()){
@@ -56,6 +59,9 @@ class Registry {
             if(shapes.has(e)) shapes.remove(e);
             if(inputs.has(e)) inputs.remove(e);
             if(bounding_boxes.has(e)) bounding_boxes.remove(e);
+            if(lifespans.has(e)) lifespans.remove(e);
+            if(damages.has(e)) damages.remove(e);
+            if(healths.has(e)) healths.remove(e);
 
             // push the clean empty id to the recycling graveyard
             m_reusableIDs.push(e);
@@ -82,10 +88,15 @@ class Registry {
             inputs.insert(e, std::move(component));
         } else if constexpr(std::is_same_v<T, CBoundingBox>){
             bounding_boxes.insert(e, std::move(component));
+        } else if constexpr(std::is_same_v<T, CLifespan>){
+            lifespans.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CDamage>){
+            damages.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CHealth>){
+            healths.insert(e, std::move(component));
         } else{
             static_assert(sizeof(T) == 0, "Unknown component type add it to addComponent template");
         }
-
     }
 
     template <typename T>
@@ -100,6 +111,12 @@ class Registry {
             return inputs.get(e);
         } else if constexpr (std::is_same_v<T, CBoundingBox>){
             return bounding_boxes.get(e);
+        } else if constexpr (std::is_same_v<T, CLifespan>){
+            return lifespans.get(e);
+        } else if constexpr (std::is_same_v<T, CDamage>){
+            return damages.get(e);
+        } else if constexpr (std::is_same_v<T, CHealth>){
+            return healths.get(e);
         } else {
         static_assert(sizeof(T) == 0, "Unknown component type add it to getComponent template");
         }
@@ -117,6 +134,12 @@ class Registry {
             return inputs.has(e);
         } else if constexpr (std::is_same_v<T, CBoundingBox>){
             return bounding_boxes.has(e);
+        } else if constexpr (std::is_same_v<T, CLifespan>){
+            return lifespans.has(e);
+        } else if constexpr (std::is_same_v<T, CDamage>){
+            return damages.has(e);
+        } else if constexpr (std::is_same_v<T, CHealth>){
+            return healths.has(e);
         }
         return false;
     }

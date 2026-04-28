@@ -4,9 +4,6 @@
 #include <algorithm> //for std::clamp
 #include <cmath> // for std::abs
 
-constexpr float player_speed = 200.0f;
-constexpr float window_x = 1280.0f;
-constexpr float window_y = 720.0f; 
 
 Engine::Engine(){
     // first initialize the window once we run the programm
@@ -18,13 +15,14 @@ Engine::Engine(){
     m_isrunning = true;
 
     // create the player entity
-    Entity player = m_registry.createentity();
+    m_player = m_registry.createentity();
     // give it some components
-    m_registry.addComponent(player, CTransform{640.0f, 360.0f});
-    m_registry.addComponent(player, CVelocity{0.0f, 0.0f});
-    m_registry.addComponent(player, CShape{20.0f});
-    m_registry.addComponent(player, CInput{});
-    m_registry.addComponent(player, CBoundingBox{40.0f, 40.0f});
+    m_registry.addComponent(m_player, CTransform{640.0f, 360.0f});
+    m_registry.addComponent(m_player, CVelocity{0.0f, 0.0f});
+    m_registry.addComponent(m_player, CShape{20.0f});
+    m_registry.addComponent(m_player, CInput{});
+    m_registry.addComponent(m_player, CBoundingBox{40.0f, 40.0f});
+    m_registry.addComponent(m_player, CHealth{});
 
     // create an enimy to test the AABB on
     Entity enemy_1 = m_registry.createentity();
@@ -32,6 +30,7 @@ Engine::Engine(){
     m_registry.addComponent(enemy_1, CVelocity{100.0f,250.0f});
     m_registry.addComponent(enemy_1, CShape{40.0f});
     m_registry.addComponent(enemy_1, CBoundingBox{80.0f, 80.0f});
+    m_registry.addComponent(enemy_1, CHealth{});
 
 
     std::cout<<"Engine started succefully";
@@ -73,11 +72,17 @@ void Engine::sUserInput(){
     sf::Event event;
     // the logic for now is to close the window if the red cross clicked or the esc butoon pressed
     while(m_window->pollEvent(event)){
+
         if(event.type == sf::Event::Closed){
             m_isrunning = false;
             // we dont call (m_window->close();) because it is getting destroyed automaticly when the loop stops and the destructor is called and to prevent crashes
 
         }
+
+        // we keep escape separated from realeased because its cleaner
+        if(event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape)
+            m_isrunning = false;
+
         if(event.type == sf::Event::KeyPressed || event.type == sf::Event::KeyReleased){
             bool is_pressed = (event.type == sf::Event::KeyPressed);
 
@@ -92,9 +97,17 @@ void Engine::sUserInput(){
             }
             
         }
-        // we keep escape separated from realeased because its cleaner
-        if(event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape)
-            m_isrunning = false;
+
+        if(event.type == sf::Event::MouseButtonPressed){
+            // create projectile on each left click
+            if(event.mouseButton.button == sf::Mouse::Left){
+                float mouse_position_x = static_cast<float>(event.mouseButton.x);
+                float mouse_position_y = static_cast<float>(event.mouseButton.y);
+                sSpawnBullet(m_player, mouse_position_x, mouse_position_y);
+
+            }
+
+        }
 
     }
 
@@ -109,6 +122,7 @@ void Engine::sUpdate(float dt){
 
         auto& entity_input    = m_registry.getComponent<CInput>(e);
         auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+        constexpr float player_speed = 200.0f;
         entity_velocity.vx = 0;
         entity_velocity.vy = 0;
         // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
@@ -144,6 +158,33 @@ void Engine::sUpdate(float dt){
 
     }
 
+    // destroy bullets if they exoire thier ifesapn or hit an enemy
+    for(Entity bullet : m_registry.lifespans.getentities()){
+
+        auto& bul_life = m_registry.getComponent<CLifespan>(bullet);
+        bul_life.life_span -= dt;
+        if(bul_life.life_span <= 0.0f){
+            m_registry.destroyentity(bullet);
+            continue; // to stop processing the dead bullet and prevent hitting an enemy with dead bullet
+        }
+
+        for(Entity enemy : m_registry.healths.getentities()){
+            if(enemy == m_player) continue;
+
+            if(isColliding(bullet, enemy)){
+                auto& enemy_health = m_registry.getComponent<CHealth>(enemy);
+                auto& bullet_damage = m_registry.getComponent<CDamage>(bullet);
+                enemy_health.health -= bullet_damage.damage;
+                m_registry.destroyentity(bullet);
+
+                if(enemy_health.health <= 0){
+                    m_registry.destroyentity(enemy);
+                }
+
+                break; // to stop the bullet from damaging many enemies
+            }
+        }
+    }
 }
 
 // our physics systems that give entities their rigid bodies
@@ -151,10 +192,13 @@ void Engine::sCollision(){
     const auto& entities_with_BB = m_registry.bounding_boxes.getentities();
     for(Entity e : entities_with_BB){
         // ensure that entity also has position to draw that bounding-box on
-        if(!m_registry.transforms.has(e)) continue;
+        // and ensure that bullets also dont collide
+        if(!m_registry.transforms.has(e) || m_registry.hasComponent<CLifespan>(e)) continue;
 
         auto& entity_transform = m_registry.getComponent<CTransform>(e);
         auto& entity_bounding_box = m_registry.getComponent<CBoundingBox>(e);
+        constexpr float window_x = 1280.0f;
+        constexpr float window_y = 720.0f; 
 
 
         // that code i wright myself i just discoverd i better way of doing thing so iam letting it commented because i dont want to delete my work :)
@@ -196,14 +240,15 @@ void Engine::sCollision(){
     // check for collisions between an entity and other entities
     for(size_t i = 0; i < entities_with_BB.size(); i++){
         Entity entity_A = entities_with_BB[i];
-        if(!m_registry.hasComponent<CTransform>(entity_A)) continue;
+        // stop bullets also from pushing entities away
+        if(!m_registry.hasComponent<CTransform>(entity_A) || m_registry.hasComponent<CLifespan>(entity_A)) continue;
 
         auto& ent_A_Tra = m_registry.getComponent<CTransform>(entity_A);
         auto& ent_A_Box = m_registry.getComponent<CBoundingBox>(entity_A);
 
         for(size_t j = (i + 1); j < entities_with_BB.size(); j++){
             Entity entity_B = entities_with_BB[j];
-            if(!m_registry.hasComponent<CTransform>(entity_B)) continue;
+            if(!m_registry.hasComponent<CTransform>(entity_B) || m_registry.hasComponent<CLifespan>(entity_B)) continue;
 
             auto& ent_B_Tra = m_registry.getComponent<CTransform>(entity_B);
             auto& ent_B_Box = m_registry.getComponent<CBoundingBox>(entity_B);
@@ -255,6 +300,26 @@ void Engine::sCollision(){
 
 }
 
+bool Engine::isColliding(Entity a, Entity b){
+    if(!m_registry.hasComponent<CTransform>(a)   || !m_registry.hasComponent<CTransform>(b)  ) return false;
+    if(!m_registry.hasComponent<CBoundingBox>(a) || !m_registry.hasComponent<CBoundingBox>(b)) return false;
+
+    auto& a_t  = m_registry.getComponent<CTransform>(a) ;
+    auto& b_t  = m_registry.getComponent<CTransform>(b) ;
+    auto& a_bb = m_registry.getComponent<CBoundingBox>(a);
+    auto& b_bb = m_registry.getComponent<CBoundingBox>(b);
+    
+    // real diffrence
+    float diff_x = std::abs(a_t.x - b_t.x);
+    float diff_y = std::abs(a_t.y - b_t.y);   
+    // minimum diffrence before collision
+    float dx = (a_bb.width  + b_bb.width ) / 2;
+    float dy = (a_bb.height + b_bb.height) / 2;
+
+    return (diff_x < dx) && (diff_y < dy);
+
+    
+}
 
 void Engine::sCleanUp(){
     // clean the dead entities that didnot survive the update system logic before sending them to be rendered
@@ -280,10 +345,12 @@ void Engine::sRender(){
         // smove the circle to the ecs memory cooardinate
         circle.setPosition(entity_transform.x, entity_transform.y);
         // give it a color
-        if(m_registry.hasComponent<CInput>(e)){
+        if(e == m_player){
             circle.setFillColor(sf::Color::Green);
-        } else {
+        } else if(m_registry.hasComponent<CLifespan>(e)) {
             circle.setFillColor(sf::Color::Red);
+        } else {
+            circle.setFillColor(sf::Color::Magenta);
         }
 
         m_window->draw(circle);
@@ -293,4 +360,30 @@ void Engine::sRender(){
     // third push the drawn frame to the window 
     m_window->display();
 
+}
+
+void Engine::sSpawnBullet(Entity creator, float position_mouse_x, float position_mouse_y){
+    if(!m_registry.hasComponent<CTransform>(creator)) return;
+
+    auto& creator_transform = m_registry.getComponent<CTransform>(creator);
+    float diff_x = position_mouse_x - creator_transform.x;
+    float diff_y = position_mouse_y - creator_transform.y;
+
+    constexpr float bullet_speed = 500.0f;
+
+    float lenght = std::sqrt(diff_x * diff_x + diff_y * diff_y);
+    // multiply the normalized vector by the bullet velocity
+    if(lenght > 0.0f){
+        float vx = (diff_x / lenght) * bullet_speed;
+        float vy = (diff_y / lenght) * bullet_speed;
+
+        Entity bullet = m_registry.createentity();
+        m_registry.addComponent(bullet, CTransform{creator_transform.x, creator_transform.y});
+        m_registry.addComponent(bullet, CVelocity{vx,vy});
+        m_registry.addComponent(bullet, CShape{5.0f});
+        m_registry.addComponent(bullet, CBoundingBox{10.0f, 10.0f});
+        m_registry.addComponent(bullet, CLifespan{2.0f});
+        m_registry.addComponent(bullet, CDamage{20.f});
+
+    }
 }
