@@ -14,29 +14,7 @@ Engine::Engine(){
     m_deltaClock = std::make_unique<sf::Clock>();
     m_isrunning = true;
 
-    // create the player entity
-    m_player = m_registry.createentity();
-    // give it some components
-    m_registry.addComponent(m_player, CTransform{640.0f, 360.0f});
-    m_registry.addComponent(m_player, CVelocity{0.0f, 0.0f});
-    m_registry.addComponent(m_player, CShape{20.0f});
-    m_registry.addComponent(m_player, CInput{});
-    m_registry.addComponent(m_player, CBoundingBox{40.0f, 40.0f});
-    m_registry.addComponent(m_player, CHealth{});
-
-    // create an enimy to test the AABB on
-    Entity enemy_1 = m_registry.createentity();
-    m_registry.addComponent(enemy_1, CTransform{50.0f,50.0f});
-    m_registry.addComponent(enemy_1, CVelocity{100.0f,250.0f});
-    m_registry.addComponent(enemy_1, CShape{40.0f});
-    m_registry.addComponent(enemy_1, CBoundingBox{80.0f, 80.0f});
-    m_registry.addComponent(enemy_1, CHealth{});
-
-    // create a floor to test the physics
-    Entity floor = m_registry.createentity();
-    m_registry.addComponent(floor, CTransform{620.0f, 700.0f});
-    m_registry.addComponent(floor, CBoundingBox{1280.0f, 40.0f});
-
+    Engine::load_level("rooms/level.yaml");
     std::cout<<"Engine started succefully";
 
 }
@@ -77,6 +55,15 @@ void Engine::sUserInput(){
     // the logic for now is to close the window if the red cross clicked or the esc butoon pressed
     while(m_window->pollEvent(event)){
 
+        //feature needed for designinig the map
+        if(event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::R){
+            for(Entity e : m_registry.bounding_boxes.getentities()){
+                m_registry.destroyentity(e); // to avoide overlab when restarting            }
+            }
+            m_registry.cleardeadentities(); // to force cleanup instanteniously not a must but having the conditionof the if must not be sked with sf::ispressed 
+            Engine::load_level("rooms/level.yaml");
+        }
+
         if(event.type == sf::Event::Closed){
             m_isrunning = false;
             // we dont call (m_window->close();) because it is getting destroyed automaticly when the loop stops and the destructor is called and to prevent crashes
@@ -105,9 +92,9 @@ void Engine::sUserInput(){
         if(event.type == sf::Event::MouseButtonPressed){
             // create projectile on each left click
             if(event.mouseButton.button == sf::Mouse::Left){
-                float mouse_position_x = static_cast<float>(event.mouseButton.x);
-                float mouse_position_y = static_cast<float>(event.mouseButton.y);
-                sSpawnBullet(m_player, mouse_position_x, mouse_position_y);
+                // you need to get the world position of the mouse because the relative position of the window will give wrong decisions when you move a distance by the window size
+                sf::Vector2f mouse_world = m_window->mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
+                sSpawnBullet(m_player, mouse_world.x, mouse_world.y);
 
             }
 
@@ -132,13 +119,6 @@ void Engine::sUpdate(float dt){
         if(entity_input.right) entity_velocity.vx += player_speed;
         if(entity_input.left)  entity_velocity.vx -= player_speed;
         
-        constexpr float gravity = 980.0f;
-        entity_velocity.vy += gravity * dt;
-        
-        // you dont want to keep accelerating to the level that you bypass the floor
-        constexpr float max_fall_speed =  735.0f;
-        entity_velocity.vy = std::min(entity_velocity.vy, max_fall_speed);
-        
         // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
         // so if we want to move down we actually increase the y value 
         constexpr float jump_power = -980.0f;
@@ -160,6 +140,15 @@ void Engine::sUpdate(float dt){
 
         auto& entity_transform = m_registry.getComponent<CTransform>(e);
         auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+
+        if(!m_registry.hasComponent<CLifespan>(e)){
+        entity_velocity.vy += m_gravity * dt;
+        
+        // you dont want to keep accelerating to the level that you bypass the floor
+        constexpr float max_fall_speed =  735.0f;
+        entity_velocity.vy = std::min(entity_velocity.vy, max_fall_speed);
+        }
+
         entity_transform.x += entity_velocity.vx * dt;
         entity_transform.y += entity_velocity.vy * dt;
 
@@ -204,44 +193,46 @@ void Engine::sCollision(){
 
         auto& entity_transform = m_registry.getComponent<CTransform>(e);
         auto& entity_bounding_box = m_registry.getComponent<CBoundingBox>(e);
-        constexpr float window_x = 1280.0f;
         constexpr float window_y = 720.0f; 
-
-
-        // that code i wright myself i just discoverd i better way of doing thing so iam letting it commented because i dont want to delete my work :)
-        // // remember that we set the origin of the entity to the center of it
-        // if((entity_transform.x - ( entity_bounding_box.width / 2.0f)) < 0.0f ){
-        //     entity_transform.x = entity_bounding_box.width / 2.0f;
-        // } else if ((entity_transform.x + (entity_bounding_box.width / 2.0f)) > 1280.0f){
-        //     entity_transform.x = 1280.0f - (entity_bounding_box.width / 2.0f);
-        // }
-        // // note that we cannot chain if else with both x and y axis because if we are in the cornor and try to move diagonal 
-        // // only the x axes will get clapped because only one if will be executed and the x comes first
-        // if ((entity_transform.y - (entity_bounding_box.height / 2.0f)) < 0.0f){
-        //     entity_transform.y = entity_bounding_box.height / 2.0f;
-        // } else if ((entity_transform.y +( entity_bounding_box.height / 2.0f)) > 720.0f){
-        //     entity_transform.y = 720.0f - (entity_bounding_box.height / 2.0f);
-        // }
 
         //here is the potimized function of c++
         const float half_width  = (entity_bounding_box.width / 2.0f);
         const float half_height = (entity_bounding_box.height/ 2.0f);
 
+        // if needed feature
         // stop entities from getting stuck when they hit the wall (allow for bing bong like mechanics)
-        if(m_registry.hasComponent<CVelocity>(e)){
-            auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
-            if(entity_transform.x <= half_width || entity_transform.x >= window_x - half_width){
-                entity_velocity.vx *= -1;
-            } 
-            if(entity_transform.y <= half_height || entity_transform.y >= window_y - half_height){
-                entity_velocity.vy *= -1;
-            }
+        // if(m_registry.hasComponent<CVelocity>(e)){
+        //     auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+        //     if(entity_transform.x <= half_width || entity_transform.x >= window_x - half_width){
+        //         entity_velocity.vx *= -1;
+        //     } 
+        //     if(entity_transform.y <= half_height || entity_transform.y >= window_y - half_height){
+        //         entity_velocity.vy *= -1;
+        //     }
 
+        // if needed featuer 
+        // can go left but not back right
+        if(entity_transform.x < half_width){
+            entity_transform.x = half_width;
         }
+        
+        // }
         // we dont need to clamp the x axes
         // stop entities from getting off the y edges unless you want them to fall to the abyss 
-        entity_transform.y = std::clamp(entity_transform.y, half_height, window_y - half_height);
-
+        // entity_transform.y = std::clamp(entity_transform.y, half_height, window_y - half_height);
+        
+        // treat the last pixel in the y axes as a floor
+        float floor = window_y - half_height;
+        if(entity_transform.y  >= floor){
+            entity_transform.y = floor;
+            
+            if(m_registry.hasComponent<CVelocity>(e)){
+                m_registry.getComponent<CVelocity>(e).vy = 0.0f;
+            }
+            if(m_registry.hasComponent<CInput>(e)){
+                m_registry.getComponent<CInput>(e).can_jump = true;
+            }
+        }
     }
     // check for collisions between an entity and other entities
     for(size_t i = 0; i < entities_with_BB.size(); i++){
@@ -273,43 +264,47 @@ void Engine::sCollision(){
 
                 bool a_can_move = m_registry.hasComponent<CVelocity>(entity_A);
                 bool b_can_move = m_registry.hasComponent<CVelocity>(entity_B);
+
                 // applying logic for making bodies rigid 
                 // (shitest if else chain i have ever done)
                 if(overlap_x < overlap_y){
                     if(a_can_move && b_can_move)
                     {
-                        if(a_can_move && b_can_move)
+                        float push_value = overlap_x / 2.0f;
+                        if(ent_A_Tra.x < ent_B_Tra.x)
                         {
-                            float push_value = overlap_x / 2.0f;
-                            if(ent_A_Tra.x < ent_B_Tra.x)
-                            {
-                                ent_A_Tra.x -= push_value;
-                                ent_B_Tra.x += push_value;
-                            } else
-                            {
-                                ent_A_Tra.x += push_value;
-                                ent_B_Tra.x -= push_value;                                
-                            }
-                        } else if(!a_can_move && b_can_move)
+                            ent_A_Tra.x -= push_value;
+                            ent_B_Tra.x += push_value;
+                        } else
                         {
-                            if(ent_A_Tra.x < ent_B_Tra.x)
-                            {
-                                ent_B_Tra.x += overlap_x;
-                            } else
-                            {
-                                ent_B_Tra.x -= overlap_x;
-                            }
-                        } else if(a_can_move && !b_can_move)
-                        {
-                            if(ent_A_Tra.x < ent_B_Tra.x)
-                            {
-                                ent_B_Tra.x -= overlap_x;
-                            } else
-                            {
-                                ent_B_Tra.x += overlap_x;
-                            }
+                            ent_A_Tra.x += push_value;
+                            ent_B_Tra.x -= push_value;                                
                         }
-                    }
+                    } else if(!a_can_move && b_can_move)
+                    {
+                        if(ent_A_Tra.x < ent_B_Tra.x)
+                        {
+                            ent_B_Tra.x += overlap_x;
+                        } else
+                        {
+                            ent_B_Tra.x -= overlap_x;
+
+                            if(m_registry.hasComponent<CInput>(entity_B))
+                            {
+                                m_registry.getComponent<CInput>(entity_B).can_jump = true;
+                            }
+                            
+                        }
+                    } else if(a_can_move && !b_can_move)
+                    {
+                        if(ent_A_Tra.x < ent_B_Tra.x)
+                        {
+                            ent_A_Tra.x -= overlap_x;
+                        } else
+                        {
+                            ent_A_Tra.x += overlap_x;
+                        }
+                    }  
                 } else
                 { if(a_can_move && b_can_move)
                     {
@@ -363,7 +358,6 @@ void Engine::sCollision(){
                         }
                     }
                 }
-                std::cout<< "collide!";
             }
 
         }
@@ -474,4 +468,80 @@ void Engine::sSpawnBullet(Entity creator, float position_mouse_x, float position
         m_registry.addComponent(bullet, CDamage{20.f});
 
     }
+}
+
+void Engine::load_level(const std::string& path){
+    try {
+        //first load the yaml file
+        YAML::Node confing = YAML::LoadFile(path);
+
+        // read global level setteings
+        if(confing["level"]["name"]){
+            std::cout<< "loading level"<< confing["level"]["name"].as<std::string>() << "\n";
+        }
+
+        // load gravity
+        if(confing["level"]["gravity"]){
+            m_gravity = confing["level"]["gravity"].as<float>();
+            std::cout<< "level grabity set to: "<< m_gravity << "\n";
+
+        }
+
+        //layout grid parsing
+        if(confing["level"]["layout"]){
+            const YAML::Node layout = confing["level"]["layout"];
+            int row = 0 ;
+            constexpr float grid_size = 40.0f;
+            constexpr float half_grid = grid_size / 2.0f;
+
+            // loop through each row in the layout
+            for(std::size_t i = 0; i < layout.size(); i++){
+                std::string line = layout[i].as<std::string>();
+
+                for(size_t col = 0; col < line.size(); col++){
+                    char entity_to_load = line[col];
+
+                    // find the center of this entity to spawn in 
+                    float center_x = (col * grid_size) + (half_grid);
+                    float center_y = (row * grid_size) + (half_grid);
+
+                    if(entity_to_load == 'B'){
+                        Entity Brick = m_registry.createentity();
+                        m_registry.addComponent(Brick, CTransform{center_x, center_y});
+                        m_registry.addComponent(Brick, CBoundingBox{grid_size, grid_size});
+                        m_registry.addComponent(Brick, CShape{20.0f});
+                    }
+
+                    if(entity_to_load == 'P'){
+                        m_player = m_registry.createentity();
+                        m_registry.addComponent(m_player, CTransform{center_x, center_y});
+                        m_registry.addComponent(m_player, CVelocity{100.0f, 100.0f});
+                        m_registry.addComponent(m_player, CInput{});
+                        m_registry.addComponent(m_player, CHealth{100.0f});
+                        m_registry.addComponent(m_player, CShape{10.f});
+                        m_registry.addComponent(m_player, CBoundingBox{20.f, 20.f});
+                    }
+
+
+                    if(entity_to_load == 'E'){
+                        Entity Enemy = m_registry.createentity();
+                        m_registry.addComponent(Enemy, CTransform{center_x, center_y});
+                        m_registry.addComponent(Enemy, CShape{10.0f});
+                        m_registry.addComponent(Enemy, CHealth{100.0f});
+                        m_registry.addComponent(Enemy, CBoundingBox{20.f, 20.f});
+                        m_registry.addComponent(Enemy, CVelocity{0.0f, 0.0f});
+                    }
+
+
+                }
+                row++;
+            }
+
+            
+        }
+    }
+    catch(const YAML::Exception& e){
+        std::cerr<< "yaml error"<< e.what()<< "\n";
+    }
+
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "Registry.hpp"
 #include <memory>
+#include <yaml-cpp/yaml.h>
 
 // forward declaration for sfml classes so we dont need to include that library in the header
 namespace sf {
@@ -21,7 +22,8 @@ class Engine{
     bool m_isrunning = true;
     // crate the player unique entity
     Entity m_player;
-
+    // making the global gravity constant to be read from yaml
+    float m_gravity = 0.0f;
 
 
     // the four phases of our loop
@@ -32,6 +34,7 @@ class Engine{
     void sRender();
     void sSpawnBullet(Entity creator, float position_mouse_x, float position_mouse_y);
     bool isColliding(Entity a, Entity b);
+    void load_level(const std::string& path);
 
     public:
         
