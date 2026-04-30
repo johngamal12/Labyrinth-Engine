@@ -39,6 +39,7 @@ class Engine{
         void sSpawnBullet(Entity creator, float position_mouse_x, float position_mouse_y);
         bool isColliding(Entity a, Entity b);
         void load_level(const std::string& path);
+        void sAnimation(float dt);
 
     public:
         

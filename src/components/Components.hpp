@@ -6,6 +6,11 @@
 struct CTransform{
     float x = 0.0f;
     float y = 0.0f;
+    float previuos_x = 0.0f, previuos_y = 0.0f;
+    bool facing_left = false;
+
+    CTransform() = default;
+    CTransform(float px, float  py) :x(px), y(py), previuos_x(px), previuos_y(py) {}
 };
 
 //speed
@@ -22,10 +27,11 @@ struct CShape{
 //input component
 struct CInput{
     bool up    = false;
-    bool down  = false;
-    bool right = false;
+    bool down  = false; 
+    bool right = false; 
     bool left  = false;
     bool can_jump = false;
+    bool attack =false;// attack using ctrl
 };
 
 //physical box used for detection detection
@@ -70,4 +76,32 @@ struct CSprite{
         tex_w = w;
         tex_h = h;
     }
+};
+
+//animation from sprite sheets
+struct CAnimation{
+    int frame_count   = 1;     // how many frames make this animation
+    int current_frame = 0;     // which frame we are currently at
+    float frame_speed = 0.15f; // how many seconds a single frame should stay on screen
+    float timer = 0.0f;        // stopwatch for the animation
+
+    // the starting pixel coordinates of the animation on the sprite sheet
+    int start_pixel_x = 0;
+    int start_pixel_y = 0;
+
+    //how many pixels from the start of the first to the start of the second frame
+    int offset_x = 0;
+
+    CAnimation() = default;
+    CAnimation(int frames, float speed, int x_coordinate, int y_coordinate, int off_x)
+    : frame_count(frames), frame_speed(speed),
+    start_pixel_x(x_coordinate), start_pixel_y(y_coordinate), offset_x(off_x) {}
+
+};
+
+//finite state machine
+struct CState{
+    std::string current_state = "idle";
+    bool has_hit = false;
+    bool is_locked = false;
 };

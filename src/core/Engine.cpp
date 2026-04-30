@@ -17,10 +17,15 @@ Engine::Engine(){
 
     //loading the heavy assest into ram once
 
-    m_assets.addtexture("tex_player", "game_assets/adventurer-idle-00-1.3.png");
-    m_assets.addtexture("tex_enemy", "game_assets/FR_Slime4_Attack_000.png");
+    m_assets.addtexture("tex_player_idle", "game_assets/player_spriteshhets/Idle.png");
+    m_assets.addtexture("tex_player_jump", "game_assets/player_spriteshhets/Jump.png");
+    m_assets.addtexture("tex_player_run", "game_assets/player_spriteshhets/Run.png");
+    m_assets.addtexture("tex_player_fall", "game_assets/player_spriteshhets/Fall.png");
+    m_assets.addtexture("tex_player_attack", "game_assets/player_spriteshhets/Attack1.png");
+    m_assets.addtexture("tex_enemy_idle", "game_assets/Skeleton-Idle.png");
     m_assets.addtexture("tex_brick", "game_assets/UI_Lifebar.png");
-    m_assets.addtexture("tex_bullet", "build/game_assets/Green-bullet.png");
+    m_assets.addtexture("tex_bullet", "game_assets/Green-Effect-and-Bullet-16x16.png");
+    m_assets.addtexture("tex_background", "game_assets/pixellab-2D-RPG-environment-background--1775311982174.png");
 
     load_level("rooms/level.yaml");
     std::cout<<"Engine started succefully";
@@ -46,6 +51,7 @@ void Engine::run(){
         // phase 2 process that input using the logic that is implemented
         sUpdate(dt);
         sCollision();
+        sAnimation(dt);
         // phase 3 cleanup dead entities before showing in the window
         sCleanUp();
         // phase4 render your current frame to draw it on the window
@@ -84,11 +90,11 @@ void Engine::sUserInput(){
             for(Entity e : m_registry.inputs.getentities()){
 
                 auto& entity_input = m_registry.getComponent<CInput>(e);
-                if(event.key.code == sf::Keyboard::W) entity_input.up    = is_pressed;
-                if(event.key.code == sf::Keyboard::S) entity_input.down  = is_pressed;
-                if(event.key.code == sf::Keyboard::D) entity_input.right = is_pressed;
-                if(event.key.code == sf::Keyboard::A) entity_input.left  = is_pressed;
-
+                if(event.key.code == sf::Keyboard::W) entity_input.up          = is_pressed;
+                if(event.key.code == sf::Keyboard::S) entity_input.down        = is_pressed;
+                if(event.key.code == sf::Keyboard::D) entity_input.right       = is_pressed;
+                if(event.key.code == sf::Keyboard::A) entity_input.left        = is_pressed;
+                if(event.key.code == sf::Keyboard::Space)  entity_input.attack = is_pressed; 
             }
             
         }
@@ -117,11 +123,18 @@ void Engine::sUpdate(float dt){
 
         auto& entity_input    = m_registry.getComponent<CInput>(e);
         auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+        auto& entity_transform = m_registry.getComponent<CTransform>(e);
         
         constexpr float player_speed = 200.0f;
         entity_velocity.vx = 0;
-        if(entity_input.right) entity_velocity.vx += player_speed;
-        if(entity_input.left)  entity_velocity.vx -= player_speed;
+        if(entity_input.right){
+            entity_velocity.vx += player_speed;
+            entity_transform.facing_left = false;  // remember we are lookinh right
+        }
+        if(entity_input.left){
+            entity_velocity.vx -= player_speed;
+            entity_transform.facing_left = true;  // remember we are looking left     
+        }
         
         // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
         // so if we want to move down we actually increase the y value 
@@ -184,6 +197,52 @@ void Engine::sUpdate(float dt){
                 break; // to stop the bullet from damaging many enemies
             }
         }
+    }
+
+    // mele combat
+    if(m_registry.hasComponent<CState>(m_player)){
+        auto& player_state = m_registry.getComponent<CState>(m_player);
+        auto& player_transform = m_registry.getComponent<CTransform>(m_player);
+        auto& player_velocity = m_registry.getComponent<CVelocity>(m_player);
+        
+        if(!player_state.has_hit && player_state.current_state == "attack"){
+
+            float reach = 50.0f; // how far the imaginary sword gets
+            float sword_width = 100.0f;
+            float sword_height = 80.0f;
+
+
+         
+            float sword_x = player_transform.facing_left ? (player_transform.x - reach) : (player_transform.x + reach);
+            float sword_y = player_transform.y;
+
+
+            for(Entity enemy : m_registry.healths.getentities()){
+                if(enemy == m_player) continue;
+
+                auto& enemy_BB = m_registry.getComponent<CBoundingBox>(enemy);
+                auto& enemy_transform = m_registry.getComponent<CTransform>(enemy);
+
+                // check is the imaginary box hit the enemy
+                float diff_x = std::abs(sword_x - enemy_transform.x);
+                float diff_y = std::abs(sword_y - enemy_transform.y);
+                float min_x = (sword_width + enemy_BB.width) / 2.0f;
+                float min_y = (sword_height + enemy_BB.height) / 2.0f;
+
+                if(diff_x < min_x && diff_y < min_y){
+                    auto& enemy_health = m_registry.getComponent<CHealth>(enemy);
+                    enemy_health.health -= m_registry.getComponent<CDamage>(m_player).damage;
+                    player_state.has_hit = true;
+
+                    if(enemy_health.health <= 0.0f){
+                        m_registry.destroyentity(enemy);
+                    }
+                    break; // save you time you already hiy one (unless you want to hit more in one splash)
+                }
+
+            }
+        }
+        
     }
 }
 
@@ -399,9 +458,28 @@ void Engine::sCleanUp(){
 void Engine::sRender(){
     // the three phases of rendering
     // first wipe the old frame (black window) to avoid drawing the player in every place he goes to
-    m_window->clear(sf::Color::Black);
+    m_window->clear(sf::Color(100, 149, 137)); // sky blue background
 
-    //spawning the cameraman to foloow our player
+    
+    // draw the background fixed to the screen 
+    // reset the view to the default so the background doesnot move with the player
+    sf::View default_view = m_window->getDefaultView();
+    m_window->setView(default_view);
+    
+    
+    sf::Sprite background_sprite;
+    background_sprite.setTexture(m_assets.gettexture("tex_background"));
+    
+    // scale the background to fill the window size
+    float background_size_x = 1280.0f / background_sprite.getLocalBounds().width;
+    float background_size_y = 720.0f / background_sprite.getLocalBounds().height;
+    background_sprite.setScale(background_size_x, background_size_y);
+    
+    m_window->draw(background_sprite);
+    
+    //spawning the cameraman to follow our player
+    // the camera in world style
+    // now we apply the camera so the rest of entities are drawn to the game world
     if(m_registry.hasComponent<CTransform>(m_player)){
         auto& player_position = m_registry.getComponent<CTransform>(m_player);
     
@@ -424,6 +502,7 @@ void Engine::sRender(){
         auto& entity_transform   = m_registry.getComponent<CTransform>(e);
         auto& entity_boundingbox = m_registry.getComponent<CBoundingBox>(e);
 
+
         // fetch the texture from ram using its name
         sf::Texture& texture = m_assets.gettexture(entity_sprite.name);
 
@@ -432,15 +511,29 @@ void Engine::sRender(){
         rendersprite.setTexture(texture);
 
         //get the original size of the downloaded image
-        sf::FloatRect bounds = rendersprite.getLocalBounds();
+        sf::FloatRect texture_bounds = rendersprite.getLocalBounds();
+
+        // if width or height are greater than zero that means that we want to crop
+        if(entity_sprite.tex_w > 0 || entity_sprite.tex_h > 0){
+            // then we only look at the wanted rectangle
+            rendersprite.setTextureRect(sf::IntRect(entity_sprite.tex_x, entity_sprite.tex_y, entity_sprite.tex_w, entity_sprite.tex_h));
+            //update the width and the height to our cropped rect
+            texture_bounds.width = entity_sprite.tex_w;
+            texture_bounds.height = entity_sprite.tex_h;
+        }
 
         // calculate the exact scale needed to match the physical bounding box
-        float scale_x = entity_boundingbox.width  / bounds.width;
-        float scale_y = entity_boundingbox.height / bounds.height;
+        float scale_x = entity_boundingbox.width  / texture_bounds.width;
+        float scale_y = entity_boundingbox.height / texture_bounds.height;
+
+        if(entity_transform.facing_left){
+            scale_x *= -1;
+        }
+
         rendersprite.setScale(scale_x, scale_y);
 
         // align the origin the be the center of the texture
-        rendersprite.setOrigin(bounds.width / 2.0f, bounds.height / 2.0f);
+        rendersprite.setOrigin(texture_bounds.width / 2.0f, texture_bounds.height / 2.0f);
 
         // move the sprite to our math coordinates
         rendersprite.setPosition(entity_transform.x, entity_transform.y);
@@ -477,7 +570,7 @@ void Engine::sSpawnBullet(Entity creator, float position_mouse_x, float position
         m_registry.addComponent(bullet, CBoundingBox{10.0f, 10.0f});
         m_registry.addComponent(bullet, CLifespan{2.0f});
         m_registry.addComponent(bullet, CDamage{20.f});
-        m_registry.addComponent(bullet, CSprite{"tex_bullet"});
+        m_registry.addComponent(bullet, CSprite{"tex_bullet", 117, 53, 7, 5});
 
     }
 }
@@ -537,10 +630,12 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(m_player, CInput{});
                         m_registry.addComponent(m_player, CHealth{100.0f});
                         m_registry.addComponent(m_player, CShape{20.f});
-                        m_registry.addComponent(m_player, CBoundingBox{40.f, 40.f});
-                        m_registry.addComponent(m_player, CSprite{"tex_player"});
+                        m_registry.addComponent(m_player, CBoundingBox{80.f, 80.f});
+                        m_registry.addComponent(m_player, CSprite{"tex_player_idle", 66, 57, 38, 43});
+                        m_registry.addComponent(m_player, CAnimation{10, .2f, 66, 57, 162});
+                        m_registry.addComponent(m_player, CState{"idle", false});
+                        m_registry.addComponent(m_player, CDamage{50.0f});
                     }
-
 
                     if(entity_to_load == 'E'){
                         Entity Enemy = m_registry.createentity();
@@ -549,7 +644,9 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(Enemy, CHealth{100.0f});
                         m_registry.addComponent(Enemy, CBoundingBox{40.f, 40.f});
                         m_registry.addComponent(Enemy, CVelocity{0.0f, 0.0f});
-                        m_registry.addComponent(Enemy, CSprite{"tex_enemy"});
+                        m_registry.addComponent(Enemy, CSprite{"tex_enemy_idle", 0, 0, 24, 32});
+                        m_registry.addComponent(Enemy, CAnimation{11, 0.2f, 0, 0, 24});
+                        m_registry.addComponent(Enemy, CState{"idle"});
                     }
                 }
                 row++;
@@ -560,4 +657,97 @@ void Engine::load_level(const std::string& path){
         std::cerr<< "yaml error"<< e.what()<< "\n";
     }
 
+}
+
+void Engine::sAnimation(float dt){
+      // FSM animations
+    for(Entity e : m_registry.states.getentities()){
+        if(!m_registry.hasComponent<CAnimation>(e) || !m_registry.hasComponent<CSprite>(e) || !m_registry.hasComponent<CVelocity>(e)) continue;
+        if(e != m_player) continue;
+        auto& entity_state = m_registry.getComponent<CState>(e);
+        auto& entity_animation = m_registry.getComponent<CAnimation>(e);
+        auto& entity_sprit = m_registry.getComponent<CSprite>(e);
+        auto& entity_velocity = m_registry.getComponent<CVelocity>(e); 
+
+        // locking the states for attacking for example to prevent spamming
+        if(entity_state.is_locked){
+            if(entity_animation.current_frame < entity_animation.frame_count -1){
+                continue;
+            } else {
+                entity_state.is_locked = false;
+            }
+
+        }       
+
+        std::string new_state = "idle";
+
+        if(entity_velocity.vx > 0.0f || entity_velocity.vx < 0.0f){
+            new_state = "run";
+        } 
+        if(entity_velocity.vy > 0.0f){
+            new_state = "fall";
+        } else if(entity_velocity.vy < 0.0f){
+            new_state = "jump";
+        }
+        if(m_registry.hasComponent<CInput>(e)){
+            auto& player_input = m_registry.getComponent<CInput>(e);
+            if(player_input.attack){
+            new_state = "attack";
+            }
+        }
+
+        if(entity_state.current_state != new_state){
+            entity_state.current_state = new_state;
+            entity_state.has_hit = false;
+            if(new_state == "idle"){
+                entity_sprit = CSprite{"tex_player_idle", 66, 57, 38, 43};
+                entity_animation = CAnimation{10, .2f, 66, 57, 162};
+            }
+            if(new_state == "run"){
+                entity_sprit = CSprite{"tex_player_run", 52, 58, 51, 43};
+                entity_animation = CAnimation{8, .2f, 52, 58, 162};
+            }
+            if(new_state == "fall"){
+                entity_sprit = CSprite{"tex_player_fall", 58, 35, 45, 66};
+                entity_animation = CAnimation{3, .2f, 58, 35, 162};
+            }
+            if(new_state == "jump"){
+                entity_sprit = CSprite{"tex_player_jump", 63, 59, 41, 44};
+                entity_animation = CAnimation{3, .2f, 63, 59, 162};
+            }
+            if(new_state == "attack"){
+                entity_sprit = CSprite{"tex_player_attack", 55, 45, 75, 55};
+                entity_animation = CAnimation{7, .2f, 55, 45, 162};
+                entity_state.is_locked = true; // to stop player from spamming the attack if the animation didnot finish
+
+            }
+            // updateEntitySpriteAndAnimation(e, new_state); // Helpful helper function to clean up code (to be added later if i survived this)
+            entity_animation.current_frame = 0;
+            entity_animation.timer = 0.0f;
+
+        }
+
+    }
+
+    for(Entity e : m_registry.animations.getentities()){
+        if(!m_registry.hasComponent<CSprite>(e)) continue;
+
+        auto& entity_sprite    = m_registry.getComponent<CSprite>(e);
+        auto& sprite_animation = m_registry.getComponent<CAnimation>(e);
+
+        sprite_animation.timer += dt;
+
+        // keep looping the frames to make the animation
+        if(sprite_animation.timer >= sprite_animation.frame_speed){
+            sprite_animation.timer -= sprite_animation.frame_speed;
+            sprite_animation.current_frame++;
+
+            // if (end of animation) -> start from begginig
+            if(sprite_animation.current_frame >= sprite_animation.frame_count){
+                sprite_animation.current_frame = 0;
+            }
+        }
+        // move chosen sprite coordintes to the desired needed one
+        entity_sprite.tex_x = sprite_animation.start_pixel_x + (sprite_animation.current_frame * sprite_animation.offset_x);
+    }
 }

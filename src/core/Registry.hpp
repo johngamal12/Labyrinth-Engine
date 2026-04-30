@@ -23,6 +23,8 @@ class Registry {
         SparseSet<CDamage> damages;
         SparseSet<CHealth> healths;
         SparseSet<CSprite> sprites;
+        SparseSet<CAnimation> animations;
+        SparseSet<CState> states;
 
         Entity createentity(){
             if(!m_reusableIDs.empty()){
@@ -64,6 +66,8 @@ class Registry {
             if(damages.has(e)) damages.remove(e);
             if(healths.has(e)) healths.remove(e);
             if(sprites.has(e)) sprites.remove(e);
+            if(animations.has(e)) animations.remove(e);
+            if(states.has(e)) states.remove(e);
 
             // push the clean empty id to the recycling graveyard
             m_reusableIDs.push(e);
@@ -98,7 +102,11 @@ class Registry {
             healths.insert(e, std::move(component));
         } else if constexpr (std::is_same_v<T, CSprite>){
             sprites.insert(e, std::move(component));
-        } else{
+        } else if constexpr (std::is_same_v<T, CAnimation>){
+            animations.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CState>){
+            states.insert(e, std::move(component));
+        }  else{
             static_assert(sizeof(T) == 0, "Unknown component type add it to addComponent template");
         }
     }
@@ -123,6 +131,10 @@ class Registry {
             return healths.get(e);
         } else if constexpr (std::is_same_v<T, CSprite>){
             return sprites.get(e);
+        } else if constexpr (std::is_same_v<T, CAnimation>){
+            return animations.get(e);
+        } else if constexpr (std::is_same_v<T, CState>){
+            return states.get(e);
         } else {
         static_assert(sizeof(T) == 0, "Unknown component type add it to getComponent template");
         }
@@ -148,6 +160,10 @@ class Registry {
             return healths.has(e);
         } else if constexpr (std::is_same_v<T, CSprite>){
             return sprites.has(e);
+        } else if constexpr (std::is_same_v<T, CAnimation>){
+            return animations.has(e);
+        } else if constexpr (std::is_same_v<T, CState>){
+            return states.has(e);
         }
         return false;
     }
