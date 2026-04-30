@@ -22,6 +22,7 @@ class Registry {
         SparseSet<CLifespan> lifespans;
         SparseSet<CDamage> damages;
         SparseSet<CHealth> healths;
+        SparseSet<CSprite> sprites;
 
         Entity createentity(){
             if(!m_reusableIDs.empty()){
@@ -62,6 +63,7 @@ class Registry {
             if(lifespans.has(e)) lifespans.remove(e);
             if(damages.has(e)) damages.remove(e);
             if(healths.has(e)) healths.remove(e);
+            if(sprites.has(e)) sprites.remove(e);
 
             // push the clean empty id to the recycling graveyard
             m_reusableIDs.push(e);
@@ -94,6 +96,8 @@ class Registry {
             damages.insert(e, std::move(component));
         } else if constexpr (std::is_same_v<T, CHealth>){
             healths.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CSprite>){
+            sprites.insert(e, std::move(component));
         } else{
             static_assert(sizeof(T) == 0, "Unknown component type add it to addComponent template");
         }
@@ -117,6 +121,8 @@ class Registry {
             return damages.get(e);
         } else if constexpr (std::is_same_v<T, CHealth>){
             return healths.get(e);
+        } else if constexpr (std::is_same_v<T, CSprite>){
+            return sprites.get(e);
         } else {
         static_assert(sizeof(T) == 0, "Unknown component type add it to getComponent template");
         }
@@ -140,6 +146,8 @@ class Registry {
             return damages.has(e);
         } else if constexpr (std::is_same_v<T, CHealth>){
             return healths.has(e);
+        } else if constexpr (std::is_same_v<T, CSprite>){
+            return sprites.has(e);
         }
         return false;
     }

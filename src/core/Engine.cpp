@@ -3,6 +3,7 @@
 #include <iostream>
 #include <algorithm> //for std::clamp
 #include <cmath> // for std::abs
+#include <yaml-cpp/yaml.h>
 
 
 Engine::Engine(){
@@ -14,7 +15,14 @@ Engine::Engine(){
     m_deltaClock = std::make_unique<sf::Clock>();
     m_isrunning = true;
 
-    Engine::load_level("rooms/level.yaml");
+    //loading the heavy assest into ram once
+
+    m_assets.addtexture("tex_player", "game_assets/adventurer-idle-00-1.3.png");
+    m_assets.addtexture("tex_enemy", "game_assets/FR_Slime4_Attack_000.png");
+    m_assets.addtexture("tex_brick", "game_assets/UI_Lifebar.png");
+    m_assets.addtexture("tex_bullet", "build/game_assets/Green-bullet.png");
+
+    load_level("rooms/level.yaml");
     std::cout<<"Engine started succefully";
 
 }
@@ -57,11 +65,7 @@ void Engine::sUserInput(){
 
         //feature needed for designinig the map
         if(event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::R){
-            for(Entity e : m_registry.bounding_boxes.getentities()){
-                m_registry.destroyentity(e); // to avoide overlab when restarting            }
-            }
-            m_registry.cleardeadentities(); // to force cleanup instanteniously not a must but having the conditionof the if must not be sked with sf::ispressed 
-            Engine::load_level("rooms/level.yaml");
+            load_level("rooms/level.yaml");
         }
 
         if(event.type == sf::Event::Closed){
@@ -411,30 +415,37 @@ void Engine::sRender(){
         m_window->setView(camera);
     }
 
-    // second draw all entities
-    const auto& shapeentities = m_registry.shapes.getentities();
-    for(Entity e : shapeentities){
+    // now iterate for all entities that have sprites not shapes
+    const auto& spriteentities = m_registry.sprites.getentities();
+    for(Entity e : spriteentities){
         if(!(m_registry.hasComponent<CTransform>(e))) continue;
 
-        auto& entity_shape     = m_registry.getComponent<CShape>(e);
-        auto& entity_transform = m_registry.getComponent<CTransform>(e);
+        auto& entity_sprite      = m_registry.getComponent<CSprite>(e);
+        auto& entity_transform   = m_registry.getComponent<CTransform>(e);
+        auto& entity_boundingbox = m_registry.getComponent<CBoundingBox>(e);
 
-        // create circiul just to represent our player
-        sf::CircleShape circle(entity_shape.radius);
-        // center the circules anchor pinot 
-        circle.setOrigin(entity_shape.radius, entity_shape.radius);
-        // smove the circle to the ecs memory cooardinate
-        circle.setPosition(entity_transform.x, entity_transform.y);
-        // give it a color
-        if(e == m_player){
-            circle.setFillColor(sf::Color::Green);
-        } else if(m_registry.hasComponent<CLifespan>(e)) {
-            circle.setFillColor(sf::Color::Red);
-        } else {
-            circle.setFillColor(sf::Color::Magenta);
-        }
+        // fetch the texture from ram using its name
+        sf::Texture& texture = m_assets.gettexture(entity_sprite.name);
 
-        m_window->draw(circle);
+        //create an sfml sprite object to render it
+        sf::Sprite rendersprite;
+        rendersprite.setTexture(texture);
+
+        //get the original size of the downloaded image
+        sf::FloatRect bounds = rendersprite.getLocalBounds();
+
+        // calculate the exact scale needed to match the physical bounding box
+        float scale_x = entity_boundingbox.width  / bounds.width;
+        float scale_y = entity_boundingbox.height / bounds.height;
+        rendersprite.setScale(scale_x, scale_y);
+
+        // align the origin the be the center of the texture
+        rendersprite.setOrigin(bounds.width / 2.0f, bounds.height / 2.0f);
+
+        // move the sprite to our math coordinates
+        rendersprite.setPosition(entity_transform.x, entity_transform.y);
+
+        m_window->draw(rendersprite);
 
     }
 
@@ -466,30 +477,36 @@ void Engine::sSpawnBullet(Entity creator, float position_mouse_x, float position
         m_registry.addComponent(bullet, CBoundingBox{10.0f, 10.0f});
         m_registry.addComponent(bullet, CLifespan{2.0f});
         m_registry.addComponent(bullet, CDamage{20.f});
+        m_registry.addComponent(bullet, CSprite{"tex_bullet"});
 
     }
 }
 
 void Engine::load_level(const std::string& path){
     try {
+        for(Entity e : m_registry.bounding_boxes.getentities()){
+            m_registry.destroyentity(e); // to avoide overlab when restarting            }
+        }
+        m_registry.cleardeadentities(); // to force cleanup instanteniously not a must but having the conditionof the if must not be sked with sf::ispressed 
+        
         //first load the yaml file
-        YAML::Node confing = YAML::LoadFile(path);
+        YAML::Node config = YAML::LoadFile(path);
 
         // read global level setteings
-        if(confing["level"]["name"]){
-            std::cout<< "loading level"<< confing["level"]["name"].as<std::string>() << "\n";
+        if(config["level"]["name"]){
+            std::cout<< "loading level"<< config["level"]["name"].as<std::string>() << "\n";
         }
 
         // load gravity
-        if(confing["level"]["gravity"]){
-            m_gravity = confing["level"]["gravity"].as<float>();
-            std::cout<< "level grabity set to: "<< m_gravity << "\n";
+        if(config["level"]["gravity"]){
+            m_gravity = config["level"]["gravity"].as<float>();
+            std::cout<< "level gravity set to: "<< m_gravity << "\n";
 
         }
 
         //layout grid parsing
-        if(confing["level"]["layout"]){
-            const YAML::Node layout = confing["level"]["layout"];
+        if(config["level"]["layout"]){
+            const YAML::Node layout = config["level"]["layout"];
             int row = 0 ;
             constexpr float grid_size = 40.0f;
             constexpr float half_grid = grid_size / 2.0f;
@@ -509,7 +526,8 @@ void Engine::load_level(const std::string& path){
                         Entity Brick = m_registry.createentity();
                         m_registry.addComponent(Brick, CTransform{center_x, center_y});
                         m_registry.addComponent(Brick, CBoundingBox{grid_size, grid_size});
-                        m_registry.addComponent(Brick, CShape{20.0f});
+                        m_registry.addComponent(Brick, CShape{40.0f});
+                        m_registry.addComponent(Brick, CSprite{"tex_brick"});
                     }
 
                     if(entity_to_load == 'P'){
@@ -518,26 +536,24 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(m_player, CVelocity{100.0f, 100.0f});
                         m_registry.addComponent(m_player, CInput{});
                         m_registry.addComponent(m_player, CHealth{100.0f});
-                        m_registry.addComponent(m_player, CShape{10.f});
-                        m_registry.addComponent(m_player, CBoundingBox{20.f, 20.f});
+                        m_registry.addComponent(m_player, CShape{20.f});
+                        m_registry.addComponent(m_player, CBoundingBox{40.f, 40.f});
+                        m_registry.addComponent(m_player, CSprite{"tex_player"});
                     }
 
 
                     if(entity_to_load == 'E'){
                         Entity Enemy = m_registry.createentity();
                         m_registry.addComponent(Enemy, CTransform{center_x, center_y});
-                        m_registry.addComponent(Enemy, CShape{10.0f});
+                        m_registry.addComponent(Enemy, CShape{20.0f});
                         m_registry.addComponent(Enemy, CHealth{100.0f});
-                        m_registry.addComponent(Enemy, CBoundingBox{20.f, 20.f});
+                        m_registry.addComponent(Enemy, CBoundingBox{40.f, 40.f});
                         m_registry.addComponent(Enemy, CVelocity{0.0f, 0.0f});
+                        m_registry.addComponent(Enemy, CSprite{"tex_enemy"});
                     }
-
-
                 }
                 row++;
-            }
-
-            
+            }  
         }
     }
     catch(const YAML::Exception& e){

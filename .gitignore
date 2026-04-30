@@ -19,3 +19,9 @@ obj/
 
 # Ignore ImGui window layout saving
 imgui.ini
+
+# Ignore assets
+.png
+.wav
+.jpg
+.mp3

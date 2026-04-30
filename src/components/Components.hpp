@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 // pure data component the POD plain old data (no logic)
 // position
@@ -46,4 +47,27 @@ struct CDamage{
 //hp until death component
 struct CHealth{
     float health = 100.0f;
+};
+
+//sprites finally
+//we keep it as simple as possible not sfml included to keep the POD
+struct CSprite{
+    std::string name = "";
+
+    int tex_x = 0;
+    int tex_y = 0;
+    int tex_w = 0;
+    int tex_h = 0;
+    //default constructor are fine 
+    CSprite() = default;
+    // coonstructor for full image
+    CSprite(const std::string& spritename) : name(spritename){}
+    //constructor for sprite sheets
+    CSprite(const std::string& spritename, int x, int y, int w, int h){
+        name = spritename;
+        tex_x = x;
+        tex_y = y;
+        tex_w = w;
+        tex_h = h;
+    }
 };
