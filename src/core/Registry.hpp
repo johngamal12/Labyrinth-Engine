@@ -16,7 +16,6 @@ class Registry {
         // the registry owns the memory arrays 
         SparseSet<CTransform> transforms;
         SparseSet<CVelocity> velocities;
-        SparseSet<CShape> shapes;
         SparseSet<CInput> inputs;
         SparseSet<CBoundingBox> bounding_boxes;
         SparseSet<CLifespan> lifespans;
@@ -25,6 +24,7 @@ class Registry {
         SparseSet<CSprite> sprites;
         SparseSet<CAnimation> animations;
         SparseSet<CState> states;
+        SparseSet<CAI> ais;
 
         Entity createentity(){
             if(!m_reusableIDs.empty()){
@@ -59,7 +59,6 @@ class Registry {
             //strip the flesh (delete the date from them)
             if(transforms.has(e)) transforms.remove(e);
             if(velocities.has(e)) velocities.remove(e);
-            if(shapes.has(e)) shapes.remove(e);
             if(inputs.has(e)) inputs.remove(e);
             if(bounding_boxes.has(e)) bounding_boxes.remove(e);
             if(lifespans.has(e)) lifespans.remove(e);
@@ -68,6 +67,7 @@ class Registry {
             if(sprites.has(e)) sprites.remove(e);
             if(animations.has(e)) animations.remove(e);
             if(states.has(e)) states.remove(e);
+            if(ais.has(e)) ais.remove(e);
 
             // push the clean empty id to the recycling graveyard
             m_reusableIDs.push(e);
@@ -88,8 +88,6 @@ class Registry {
             transforms.insert(e, std::move(component));
         } else if constexpr (std::is_same_v<T, CVelocity>){
             velocities.insert(e, std::move(component));
-        } else if constexpr (std::is_same_v<T, CShape>){
-            shapes.insert(e, std::move(component));
         } else if constexpr (std::is_same_v<T, CInput>){
             inputs.insert(e, std::move(component));
         } else if constexpr(std::is_same_v<T, CBoundingBox>){
@@ -106,6 +104,8 @@ class Registry {
             animations.insert(e, std::move(component));
         } else if constexpr (std::is_same_v<T, CState>){
             states.insert(e, std::move(component));
+        } else if constexpr (std::is_same_v<T, CAI>){
+            ais.insert(e, std::move(component));
         }  else{
             static_assert(sizeof(T) == 0, "Unknown component type add it to addComponent template");
         }
@@ -117,8 +117,6 @@ class Registry {
             return transforms.get(e);
         } else if constexpr (std::is_same_v<T, CVelocity>){
             return velocities.get(e);
-        } else if constexpr (std::is_same_v<T, CShape>){
-            return shapes.get(e);
         } else if constexpr (std::is_same_v<T, CInput>){
             return inputs.get(e);
         } else if constexpr (std::is_same_v<T, CBoundingBox>){
@@ -135,6 +133,8 @@ class Registry {
             return animations.get(e);
         } else if constexpr (std::is_same_v<T, CState>){
             return states.get(e);
+        } else if constexpr (std::is_same_v<T, CAI>){
+            return ais.get(e);
         } else {
         static_assert(sizeof(T) == 0, "Unknown component type add it to getComponent template");
         }
@@ -146,8 +146,6 @@ class Registry {
             return transforms.has(e);
         } else if constexpr (std::is_same_v<T, CVelocity>){
             return velocities.has(e);
-        } else if constexpr (std::is_same_v<T, CShape>){
-            return shapes.has(e);
         } else if constexpr (std::is_same_v<T, CInput>){
             return inputs.has(e);
         } else if constexpr (std::is_same_v<T, CBoundingBox>){
@@ -164,6 +162,8 @@ class Registry {
             return animations.has(e);
         } else if constexpr (std::is_same_v<T, CState>){
             return states.has(e);
+        } else if constexpr (std::is_same_v<T, CAI>){
+            return ais.has(e);
         }
         return false;
     }

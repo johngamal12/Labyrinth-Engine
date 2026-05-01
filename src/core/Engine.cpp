@@ -4,6 +4,7 @@
 #include <algorithm> //for std::clamp
 #include <cmath> // for std::abs
 #include <yaml-cpp/yaml.h>
+#include <vector>
 
 
 Engine::Engine(){
@@ -23,11 +24,14 @@ Engine::Engine(){
     m_assets.addtexture("tex_player_fall", "game_assets/player_spriteshhets/Fall.png");
     m_assets.addtexture("tex_player_attack", "game_assets/player_spriteshhets/Attack1.png");
     m_assets.addtexture("tex_enemy_idle", "game_assets/Skeleton-Idle.png");
+    m_assets.addtexture("tex_enemy_walk", "game_assets/Skeleton Walk.png");
+    m_assets.addtexture("tex_enemy_attack", "game_assetsSkeleton Walk.png");
+    m_assets.addtexture("tex_enemy_dead", "game_assets/Skeleton Dead.png");
     m_assets.addtexture("tex_brick", "game_assets/UI_Lifebar.png");
     m_assets.addtexture("tex_bullet", "game_assets/Green-Effect-and-Bullet-16x16.png");
     m_assets.addtexture("tex_background", "game_assets/pixellab-2D-RPG-environment-background--1775311982174.png");
 
-    load_level("rooms/level.yaml");
+    load_level("rooms/level01.yaml");
     std::cout<<"Engine started succefully";
 
 }
@@ -50,6 +54,7 @@ void Engine::run(){
         sUserInput();
         // phase 2 process that input using the logic that is implemented
         sUpdate(dt);
+        sAI(dt);
         sCollision();
         sAnimation(dt);
         // phase 3 cleanup dead entities before showing in the window
@@ -142,6 +147,9 @@ void Engine::sUpdate(float dt){
         if(entity_input.up && entity_input.can_jump){
             entity_velocity.vy    = jump_power;
             entity_input.can_jump = false;
+            if(m_registry.hasComponent<CState>(e)){
+                m_registry.getComponent<CState>(e).is_grounded = false;
+            }
         }
 
         //for variable jumb height
@@ -248,6 +256,12 @@ void Engine::sUpdate(float dt){
 
 // our physics systems that give entities their rigid bodies
 void Engine::sCollision(){
+
+    for(Entity e : m_registry.states.getentities()){
+        m_registry.getComponent<CState>(e).is_grounded = false;
+    }
+
+
     const auto& entities_with_BB = m_registry.bounding_boxes.getentities();
     for(Entity e : entities_with_BB){
         // ensure that entity also has position to draw that bounding-box on
@@ -294,6 +308,9 @@ void Engine::sCollision(){
             }
             if(m_registry.hasComponent<CInput>(e)){
                 m_registry.getComponent<CInput>(e).can_jump = true;
+            }
+            if(m_registry.hasComponent<CState>(e)){
+                m_registry.getComponent<CState>(e).is_grounded = true;
             }
         }
     }
@@ -356,6 +373,10 @@ void Engine::sCollision(){
                             {
                                 m_registry.getComponent<CInput>(entity_B).can_jump = true;
                             }
+                            if(m_registry.hasComponent<CState>(entity_B))
+                            {
+                                m_registry.getComponent<CState>(entity_B).is_grounded = true;
+                            }
                             
                         }
                     } else if(a_can_move && !b_can_move)
@@ -380,6 +401,10 @@ void Engine::sCollision(){
                             {
                                 m_registry.getComponent<CInput>(entity_A).can_jump = true;
                             }
+                            if(m_registry.hasComponent<CState>(entity_B))
+                            {
+                                m_registry.getComponent<CState>(entity_B).is_grounded = true;
+                            }
                             m_registry.getComponent<CVelocity>(entity_A).vy = 0.0f;
                         } else 
                         {
@@ -403,6 +428,10 @@ void Engine::sCollision(){
                             {
                                 m_registry.getComponent<CInput>(entity_B).can_jump = true;
                             }
+                            if(m_registry.hasComponent<CState>(entity_B))
+                            {
+                                m_registry.getComponent<CState>(entity_B).is_grounded = true;
+                            }
                             m_registry.getComponent<CVelocity>(entity_B).vy = 0.0f;    
                         }
                     } else if(a_can_move && !b_can_move)
@@ -413,6 +442,10 @@ void Engine::sCollision(){
                             if(m_registry.hasComponent<CInput>(entity_A))
                             {
                                 m_registry.getComponent<CInput>(entity_A).can_jump = true ;
+                            }
+                            if(m_registry.hasComponent<CState>(entity_B))
+                            {
+                                m_registry.getComponent<CState>(entity_B).is_grounded = true;
                             }
                             m_registry.getComponent<CVelocity>(entity_A).vy = 0.0f;
                         } else
@@ -539,6 +572,31 @@ void Engine::sRender(){
         rendersprite.setPosition(entity_transform.x, entity_transform.y);
 
         m_window->draw(rendersprite);
+        // ==========================================
+// AI DEBUG RENDERING (Temporary Testing Code)
+// ==========================================
+for (Entity e : m_registry.ais.getentities()) {
+    // Make sure we only draw for enemies that actually have an active path
+    auto& enemy_ai = m_registry.getComponent<CAI>(e);
+    
+    if (enemy_ai.waypoints.empty()) continue;
+
+    // Draw a small red box for every node in the current path
+    for (size_t i = enemy_ai.current_waypoint; i < enemy_ai.waypoints.size(); i++) {
+        const CGridPos& node = enemy_ai.waypoints[i];
+
+        sf::RectangleShape debugSquare(sf::Vector2f(10.0f, 10.0f));
+        debugSquare.setFillColor(sf::Color::Red);
+        debugSquare.setOrigin(5.0f, 5.0f); // Center the origin
+
+        // Convert the grid integer back to world float coordinates
+        float world_x = (node.col * 40.0f) + 20.0f; // 40.0f is grid size, 20.0f is half_grid
+        float world_y = (node.row * 40.0f) + 20.0f;
+        
+        debugSquare.setPosition(world_x, world_y);
+        m_window->draw(debugSquare);
+    }
+}
 
     }
 
@@ -566,7 +624,6 @@ void Engine::sSpawnBullet(Entity creator, float position_mouse_x, float position
         Entity bullet = m_registry.createentity();
         m_registry.addComponent(bullet, CTransform{creator_transform.x, creator_transform.y});
         m_registry.addComponent(bullet, CVelocity{vx,vy});
-        m_registry.addComponent(bullet, CShape{5.0f});
         m_registry.addComponent(bullet, CBoundingBox{10.0f, 10.0f});
         m_registry.addComponent(bullet, CLifespan{2.0f});
         m_registry.addComponent(bullet, CDamage{20.f});
@@ -600,6 +657,7 @@ void Engine::load_level(const std::string& path){
         //layout grid parsing
         if(config["level"]["layout"]){
             const YAML::Node layout = config["level"]["layout"];
+            m_navGrid.clear();
             int row = 0 ;
             constexpr float grid_size = 40.0f;
             constexpr float half_grid = grid_size / 2.0f;
@@ -607,6 +665,7 @@ void Engine::load_level(const std::string& path){
             // loop through each row in the layout
             for(std::size_t i = 0; i < layout.size(); i++){
                 std::string line = layout[i].as<std::string>();
+                std::vector<int> gridRow;
 
                 for(size_t col = 0; col < line.size(); col++){
                     char entity_to_load = line[col];
@@ -619,8 +678,10 @@ void Engine::load_level(const std::string& path){
                         Entity Brick = m_registry.createentity();
                         m_registry.addComponent(Brick, CTransform{center_x, center_y});
                         m_registry.addComponent(Brick, CBoundingBox{grid_size, grid_size});
-                        m_registry.addComponent(Brick, CShape{40.0f});
                         m_registry.addComponent(Brick, CSprite{"tex_brick"});
+                        gridRow.push_back(1);
+                    } else{
+                        gridRow.push_back(0);
                     }
 
                     if(entity_to_load == 'P'){
@@ -629,8 +690,7 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(m_player, CVelocity{100.0f, 100.0f});
                         m_registry.addComponent(m_player, CInput{});
                         m_registry.addComponent(m_player, CHealth{100.0f});
-                        m_registry.addComponent(m_player, CShape{20.f});
-                        m_registry.addComponent(m_player, CBoundingBox{80.f, 80.f});
+                        m_registry.addComponent(m_player, CBoundingBox{75.0f, 75.0f});
                         m_registry.addComponent(m_player, CSprite{"tex_player_idle", 66, 57, 38, 43});
                         m_registry.addComponent(m_player, CAnimation{10, .2f, 66, 57, 162});
                         m_registry.addComponent(m_player, CState{"idle", false});
@@ -640,15 +700,28 @@ void Engine::load_level(const std::string& path){
                     if(entity_to_load == 'E'){
                         Entity Enemy = m_registry.createentity();
                         m_registry.addComponent(Enemy, CTransform{center_x, center_y});
-                        m_registry.addComponent(Enemy, CShape{20.0f});
                         m_registry.addComponent(Enemy, CHealth{100.0f});
                         m_registry.addComponent(Enemy, CBoundingBox{40.f, 40.f});
                         m_registry.addComponent(Enemy, CVelocity{0.0f, 0.0f});
                         m_registry.addComponent(Enemy, CSprite{"tex_enemy_idle", 0, 0, 24, 32});
                         m_registry.addComponent(Enemy, CAnimation{11, 0.2f, 0, 0, 24});
                         m_registry.addComponent(Enemy, CState{"idle"});
+                        m_registry.addComponent(Enemy, CAI{});
+                    }
+                    if(entity_to_load == 'F'){
+                        // should have been a flying enemy but iam too lazy to get a new texture for these guyes
+                        Entity Enemy = m_registry.createentity();
+                        m_registry.addComponent(Enemy, CTransform{center_x, center_y});
+                        m_registry.addComponent(Enemy, CHealth{100.0f});
+                        m_registry.addComponent(Enemy, CBoundingBox{40.f, 40.f});
+                        m_registry.addComponent(Enemy, CVelocity{0.0f, 0.0f});
+                        m_registry.addComponent(Enemy, CSprite{"tex_enemy_idle", 0, 0, 24, 32});
+                        m_registry.addComponent(Enemy, CAnimation{11, 0.2f, 0, 0, 24});
+                        m_registry.addComponent(Enemy, CState{"idle"});
+                        m_registry.addComponent(Enemy, CAI{{}, 0, 0.0f, true});                        
                     }
                 }
+                m_navGrid.push_back(gridRow);
                 row++;
             }  
         }
@@ -750,4 +823,225 @@ void Engine::sAnimation(float dt){
         // move chosen sprite coordintes to the desired needed one
         entity_sprite.tex_x = sprite_animation.start_pixel_x + (sprite_animation.current_frame * sprite_animation.offset_x);
     }
+}
+
+// our smart NPCs
+void Engine::sAI(float dt){
+    // if the player doesnot exist do not do anything
+    if(m_player == -1 || !m_registry.hasComponent<CTransform>(m_player)) return;
+    auto& player_position = m_registry.getComponent<CTransform>(m_player);
+
+    // enigne constants for translating world float coordinates to grid int coordinates
+    constexpr float grid_size = 40.0f;
+    constexpr float half_grid = grid_size / 2.0f;
+
+    for(Entity e : m_registry.ais.getentities()){
+        
+        auto& enemy_position = m_registry.getComponent<CTransform>(e);
+        auto& enemy_velocity = m_registry.getComponent<CVelocity>(e);
+        auto& enemy_state = m_registry.getComponent<CState>(e);
+
+        // fetch ai component so we can sore the path
+        auto& enemy_ai = m_registry.getComponent<CAI>(e);
+        if(!m_registry.hasComponent<CBoundingBox>(e)) continue;
+        auto& enemy_bb = m_registry.getComponent<CBoundingBox>(e);
+
+        float diff_x = player_position.x - enemy_position.x;
+        float diff_y = player_position.y - enemy_position.y;
+        float distance = std::sqrt((diff_x * diff_x) + (diff_y * diff_y));
+
+        if(distance <= 400.f){
+            enemy_state.current_state = "chase";
+        } else {
+            enemy_state.current_state = "patrol";
+        }
+        // if y is small you are standing on the floor
+        bool is_on_ground = std::abs(enemy_velocity.vy) < 1.0f ;
+
+        // flying enemy logic (A*)
+        if(enemy_ai.is_flying){
+            if(enemy_state.current_state == "chase"){
+                enemy_ai.path_update_timer -= dt;
+
+            // calculate A* path every 0.25 second
+            // only run the heavy math every 0.25 seconds
+            if(enemy_ai.path_update_timer <= 0.0f){
+                // convert float world coordinates to integer grid cells (eg. 105.5f -> cell2)
+                CGridPos startGrid = {static_cast<int>(enemy_position.x / grid_size), static_cast<int>(enemy_position.y / grid_size)};
+                CGridPos targetGrid = {static_cast<int>(player_position.x / grid_size), static_cast<int>(player_position.y / grid_size)};
+                
+                // calculate the node path
+                enemy_ai.waypoints = calculatePath(startGrid, targetGrid);
+                enemy_ai.current_waypoint = 0;     // start at the first step
+                enemy_ai.path_update_timer = 0.20f; // reset the cooldown
+            }    
+            
+
+            // waypoint navigation (fly towards the waypoint)
+            if(!enemy_ai.waypoints.empty() && enemy_ai.current_waypoint < enemy_ai.waypoints.size()){
+
+                // get the grid cell we want to walk to, and convert it back to world float coordinates
+                CGridPos targetGrid = enemy_ai.waypoints[enemy_ai.current_waypoint];
+                float target_x = (targetGrid.col * grid_size) + half_grid;
+                float target_y = (targetGrid.row * grid_size) + half_grid;
+
+                float dir_x = target_x - enemy_position.x;
+                float dir_y = target_y - enemy_position.y;
+
+                // if we are close to the target tile target the next tile
+                if(std::abs(dir_x) < 10.0f && std::abs(dir_y) < 10.0f){
+                    enemy_ai.current_waypoint++;
+                } else {
+                    // normalize vector for smooth diagonal flying
+                    float lenght = std::sqrt(dir_x * dir_x + dir_y * dir_y);
+                    constexpr float flight_speed = 150.0f;
+
+                    if(lenght > 0.0f) {
+                        enemy_velocity.vx = (dir_x / lenght) * flight_speed;
+                        // we pypass the gravity in flying enemies by subtracting it again after adding it in sColiision
+                        enemy_velocity.vy = ((dir_y / lenght) * flight_speed) - (m_gravity * dt);
+                    }
+                } 
+            } else{
+                    // no path found -> hover in place
+                    enemy_velocity.vx = 0.0f;
+                    enemy_velocity.vy = 0.0f - (m_gravity * dt);
+                }
+            } else if(enemy_state.current_state == "patrol"){
+                // again stop flying and just hover when the player is out of range
+                enemy_velocity.vx = 0.0f;
+                enemy_velocity.vy = 0.0f - (m_gravity * dt);
+            }
+        }
+        // ground enemy logic
+        else{
+            if(enemy_state.current_state == "chase"){
+                // move horizontaly with small deadxone to allow a space for attack later
+                if(diff_x > 20.0f){
+                    enemy_velocity.vx = 150.0f;
+                } else if(diff_x < -20.0f){
+                    enemy_velocity.vx = -150.0f;
+                } else{
+                    enemy_velocity.vx = 0.0f; //stop vibrating if uner or top of the enemy
+                }
+                if(diff_y < -40.0f && is_on_ground){
+                    enemy_velocity.vy = - 600.0f;
+                }
+            
+
+        } else if(enemy_state.current_state == "patrol"){
+            // kickstart movement if they are standing still
+            if(enemy_velocity.vx == 0.0f) enemy_velocity.vx = 50.0f;
+            
+            // detect if there is a ground a head of the enemy or it can fall
+            float checkdistance = (enemy_velocity.vx > 0.0f) ? (enemy_bb.width / 2.0f +  5.0f) : -(enemy_bb.width / 2.0f +5.0f);
+            float check_x = enemy_position.x + checkdistance;
+            float check_y_floor = enemy_position.y + (enemy_bb.height / 2.0f) + 2.0f;
+            float check_y_wall = enemy_position.y;
+
+            bool has_ground = false;
+            bool hit_wall = false;
+
+            // ask if there is any solid entity near the check point
+            for(Entity o : m_registry.bounding_boxes.getentities()){
+                if(e == o || 0 == m_player ||!m_registry.hasComponent<CBoundingBox>(o)) continue;
+                auto& other_tra = m_registry.getComponent<CTransform>(o);
+                auto& other_bb = m_registry.getComponent<CBoundingBox>(o);
+
+
+                float left    = other_tra.x -( other_bb.width / 2.0f);
+                float right   = other_tra.x + (other_bb.width / 2.0f);
+                float top    = other_tra.y - (other_bb.height / 2.0f);
+                float bottom = other_tra.y + (other_bb.height / 2.0f);
+
+                if(check_x > left && check_x < right && check_y_floor < bottom && check_y_floor > top){
+                    has_ground = true;
+                }
+                if(check_x > left && check_x < right && check_y_wall > top && check_y_wall < bottom){
+                    hit_wall = true;
+                }
+
+            }
+            if(!has_ground || hit_wall){
+                enemy_velocity.vx *= -1;
+            }
+
+        }
+
+    }
+
+}}
+
+// our beloved fancy A*
+std::vector<CGridPos> Engine::calculatePath(CGridPos start, CGridPos target){
+    std::vector<CGridPos> path;
+
+    if(m_navGrid.empty()) return path;
+    int rows = m_navGrid.size();
+    if (rows == 0) return path;
+    int cols = m_navGrid[0].size();
+
+    //bounds check ensure start / target rows have enough columns
+    if(start.col < 0 || start.col >= cols || start.row < 0 || start.row >= m_navGrid[start.row].size()
+    || target.col < 0 || target.col >= cols || target.row < 0 || target.row >= m_navGrid[start.row].size()){
+        return path;
+    }
+
+    std::priority_queue<CPathNode> openList;
+    std::vector<std::vector<bool>> closedList(rows, std::vector<bool>(cols, false));
+
+    // to avoid row pointer mangment issues with CPathNodes* parent
+    // we use a 2D array to map where each node came from.
+    std::vector<std::vector<CGridPos>> parentMap(rows, std::vector<CGridPos>(cols, {-1, -1}));
+
+    CPathNode startNode{start.col, start.row, 0.0f, 0.0f, 0.0f, nullptr};
+    openList.push(startNode);
+
+    // up, down, left, right
+    int dRow[] = {-1, 1, 0, 0};
+    int dCol[] = {0, 0, -1, 1};
+
+    while (!openList.empty()) {
+        CPathNode current = openList.top();
+        openList.pop();
+
+        if (current.x == target.col && current.y == target.row){
+            // reconstruct the path
+            CGridPos currPos = {current.x, current.y};
+            while (currPos.col != -1 && currPos.row != -1){
+                path.push_back(currPos);
+                currPos = parentMap[currPos.row][currPos.col];
+            }
+            std::reverse(path.begin(), path.end());
+            return path;
+        }
+
+        if(closedList[current.y][current.x]) continue;
+        closedList[current.y][current.x] = true;
+
+        for(int i = 0; i < 4; i++) {
+            int newCol = current.x + dCol[i];
+            int newRow = current.y + dRow[i];
+
+            // grid boundry check
+            if(newCol >= 0 &&newCol < cols && newRow >= 0 && newRow < rows){
+
+                // check if the specific yaml row was drawn shorter than the others 
+                if(newCol < m_navGrid[newRow].size()){
+
+                    // now its safe to check the vector
+                    if(m_navGrid[newRow][newCol] == 0 && !closedList[newRow][newCol]){
+                        
+                        float gCost = current.gCost + 1.0f;
+                        float hCost = std::abs(newCol - target.col) + std::abs(newRow - target.row);
+                        float fCost = gCost + hCost;
+
+                        parentMap[newRow][newCol] = {current.x, current.y}; // Track parent safely
+                        openList.push(CPathNode{newCol, newRow, gCost, hCost, fCost, nullptr});
+                    }
+                }
+            }
+        }
+    }
+    return path;
 }

@@ -3,6 +3,7 @@
 #include "AssetManager.hpp"
 #include <memory>
 
+
 // forward declaration for sfml classes so we dont need to include that library in the header
 namespace sf {
     class RenderWindow; 
@@ -26,7 +27,8 @@ class Engine{
         float m_gravity = 0.0f;
         // the engine owns the asset library
         AssetManager m_assets;
-
+        // navigation grid for A*
+        std::vector<std::vector<int>> m_navGrid; // 0-> empty , 1-> wall
 
 
         // the phases of our loop
@@ -40,6 +42,9 @@ class Engine{
         bool isColliding(Entity a, Entity b);
         void load_level(const std::string& path);
         void sAnimation(float dt);
+        void sAI(float dt);
+        std::vector<CGridPos> calculatePath(CGridPos start, CGridPos target);
+
 
     public:
         

@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 
 // pure data component the POD plain old data (no logic)
 // position
@@ -31,7 +32,7 @@ struct CInput{
     bool right = false; 
     bool left  = false;
     bool can_jump = false;
-    bool attack =false;// attack using ctrl
+    bool attack =false;// attack using space
 };
 
 //physical box used for detection detection
@@ -104,4 +105,36 @@ struct CState{
     std::string current_state = "idle";
     bool has_hit = false;
     bool is_locked = false;
+    bool is_grounded = false;
+    float jump_cooldown = 0.0f;
+};
+
+//node for the A*
+struct CPathNode{
+    int x, y; //grid coordinate (rpw, column)
+    float gCost; //distance from start
+    float hCost; // distance to goal
+    float fCost; // G + H
+    CPathNode* parent = nullptr; // the node we came from
+    // A* needs to find the lowest fcostso we need a way to compare nodes
+    bool operator<(const CPathNode& other) const{
+        return fCost > other.fCost;
+    }
+};
+
+//x,y grid coordinate
+struct CGridPos{
+    int col, row;
+    bool operator == (const CGridPos& other){
+        return col == other.col && row == other.row;
+    }
+};
+
+
+
+struct CAI{
+    std::vector<CGridPos> waypoints;
+    size_t current_waypoint = 0;
+    float path_update_timer = 0.0f;
+    bool is_flying = false;
 };
