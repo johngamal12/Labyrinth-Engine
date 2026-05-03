@@ -1133,7 +1133,7 @@ void Engine::sAI(float dt){
 
                     // ask if there is any solid entity near the check point
                     for(Entity o : m_registry.bounding_boxes.getentities()){
-                        if(e == o || 0 == m_player ||!m_registry.hasComponent<CBoundingBox>(o)) continue;
+                        if(e == o || o == m_player ||!m_registry.hasComponent<CBoundingBox>(o)) continue;
                         auto& other_tra = m_registry.getComponent<CTransform>(o);
                         auto& other_bb = m_registry.getComponent<CBoundingBox>(o);
 
@@ -1164,7 +1164,7 @@ void Engine::sAI(float dt){
                         float weapon_width = 60.0f;
                         float weapon_height = 60.0f;
 
-                        enemy_position.facing_left = (enemy_position.x < player_position.x);
+                        enemy_position.facing_left = (enemy_position.x > player_position.x);
 
                         float weapon_x = enemy_position.facing_left ? (enemy_position.x - reach) : (enemy_position.x + reach);
                         float weapon_y = enemy_position.y;
