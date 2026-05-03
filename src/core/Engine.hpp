@@ -29,6 +29,8 @@ class Engine{
         AssetManager m_assets;
         // navigation grid for A*
         std::vector<std::vector<int>> m_navGrid; // 0-> empty , 1-> wall
+        // tracting the state of the game
+        GameState m_currentState = GameState::MainMenu;
 
 
         // the phases of our loop

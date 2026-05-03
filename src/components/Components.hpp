@@ -137,4 +137,12 @@ struct CAI{
     size_t current_waypoint = 0;
     float path_update_timer = 0.0f;
     bool is_flying = false;
+    float attack_timer = 0.0f; // limites the number of attacks per second
+};
+
+//game state
+enum class GameState{
+    MainMenu,
+    Playing,
+    GameOver
 };
