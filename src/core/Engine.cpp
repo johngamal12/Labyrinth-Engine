@@ -202,7 +202,8 @@ void Engine::sUpdate(float dt){
                 m_registry.destroyentity(bullet);
                 continue; // to stop processing the dead bullet and prevent hitting an enemy with dead bullet
             }
-            if(!m_registry.hasComponent<CDamage>(bullet)) continue;
+            if(!m_registry.hasComponent<CDamage>(bullet)) continue; 
+            if(m_registry.hasComponent<CHealth>(bullet)) continue; // thats a dead enemy 
 
             for(Entity enemy : m_registry.healths.getentities()){
                 if(enemy == m_player) continue;
@@ -218,6 +219,7 @@ void Engine::sUpdate(float dt){
                             // give it 1.5 seconds to play dead and then it destroys automatically because it now has a life span
                             m_registry.addComponent(enemy, CLifespan{1.5f});
                             m_registry.getComponent<CState>(enemy).current_state = "dead";
+                            m_registry.getComponent<CState>(enemy).is_locked = false;
                         }
                     }
 
@@ -265,6 +267,8 @@ void Engine::sUpdate(float dt){
                             if(!m_registry.hasComponent<CLifespan>(enemy)){
                                 m_registry.addComponent(enemy, CLifespan{1.5f});
                                 m_registry.getComponent<CState>(enemy).current_state = "dead";
+                                m_registry.getComponent<CState>(enemy).is_locked = false;
+
                             }
                         }
                         break; // save you time you already hiy one (unless you want to hit more in one splash)
@@ -441,7 +445,7 @@ void Engine::sCollision(){
                                 {
                                     m_registry.getComponent<CInput>(entity_A).can_jump = true;
                                 }
-                                if(m_registry.hasComponent<CState>(entity_B))
+                                if(m_registry.hasComponent<CState>(entity_A))
                                 {
                                     m_registry.getComponent<CState>(entity_B).is_grounded = true;
                                 }
@@ -632,32 +636,7 @@ void Engine::sRender(){
             rendersprite.setPosition(entity_transform.x, entity_transform.y);
 
             m_window->draw(rendersprite);
-            // ==========================================
-    // AI DEBUG RENDERING (Temporary Testing Code)
-    // ==========================================
-    for (Entity e : m_registry.ais.getentities()) {
-        // Make sure we only draw for enemies that actually have an active path
-        auto& enemy_ai = m_registry.getComponent<CAI>(e);
-        
-        if (enemy_ai.waypoints.empty()) continue;
-
-        // Draw a small red box for every node in the current path
-        for (size_t i = enemy_ai.current_waypoint; i < enemy_ai.waypoints.size(); i++) {
-            const CGridPos& node = enemy_ai.waypoints[i];
-
-            sf::RectangleShape debugSquare(sf::Vector2f(10.0f, 10.0f));
-            debugSquare.setFillColor(sf::Color::Red);
-            debugSquare.setOrigin(5.0f, 5.0f); // Center the origin
-
-            // Convert the grid integer back to world float coordinates
-            float world_x = (node.col * 40.0f) + 20.0f; // 40.0f is grid size, 20.0f is half_grid
-            float world_y = (node.row * 40.0f) + 20.0f;
-            
-            debugSquare.setPosition(world_x, world_y);
-            m_window->draw(debugSquare);
-        }
-    }
-
+          
         }
     }
      if(m_currentState == GameState::MainMenu){
@@ -951,7 +930,7 @@ void Engine::sAnimation(float dt){
 
             // if (end of animation) -> start from begginig
             if(sprite_animation.current_frame >= sprite_animation.frame_count){
-                sprite_animation.current_frame = 0;
+                    sprite_animation.current_frame = 0; 
             }
         }
         // move chosen sprite coordintes to the desired needed one
@@ -1003,8 +982,6 @@ void Engine::sAI(float dt){
                 } else {
                     enemy_state.current_state = "patrol";
                 }
-                // if y is small you are standing on the floor
-                bool is_on_ground = std::abs(enemy_velocity.vy) < 1.0f ;
 
                 // flying enemy logic (A*)
                 if(enemy_ai.is_flying){
@@ -1114,8 +1091,9 @@ void Engine::sAI(float dt){
                         } else{
                             enemy_velocity.vx = 0.0f; //stop vibrating if uner or top of the enemy
                         }
-                        if(diff_y < -40.0f && is_on_ground){
-                            enemy_velocity.vy = - 600.0f;
+                        if(diff_y < -40.0f && enemy_state.is_grounded && enemy_ai.attack_timer <= 0.0f){
+                            enemy_velocity.vy = - 400.0f;
+                            enemy_state.is_grounded = false;
                         }
                     
                 } else if(enemy_state.current_state == "patrol"){
