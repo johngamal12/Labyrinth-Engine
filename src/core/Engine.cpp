@@ -31,10 +31,12 @@ Engine::Engine(){
     m_assets.addtexture("tex_enemy_chase", "game_assets/Skeleton-Walk.png");
     m_assets.addtexture("tex_enemy_attack", "game_assets/Skeleton-Attack.png");
     m_assets.addtexture("tex_enemy_dead", "game_assets/Skeleton-Dead.png");
-    m_assets.addtexture("tex_brick", "game_assets/UI_Lifebar.png");
+    m_assets.addtexture("tex_grass", "game_assets/grass_1.png");
+    m_assets.addtexture("tex_ground", "game_assets/ground_1.png");
     m_assets.addtexture("tex_bullet", "game_assets/Green-Effect-and-Bullet-16x16.png");
-    m_assets.addtexture("tex_background", "game_assets/pixellab-2D-RPG-environment-background--1775311982174.png");
+    m_assets.addtexture("tex_background", "game_assets/Image.png");
     m_assets.addtexture("tex_attack_effect", "game_assets/PunchImp1.png");
+    m_assets.addtexture("flying_enemy_tex", "game_assets/cthulu_192x112_SpriteSheet.png");
     load_level("rooms/level01.yaml");
     std::cout<<"Engine started succefully";
 
@@ -135,163 +137,168 @@ void Engine::sUserInput(){
 // for example if the fps is 30 and the update depends on the frames it will run in half speed but because it is time dependent it will run less smothly but the same speed
 void Engine::sUpdate(float dt){
     switch(m_currentState){
-        case GameState::Playing:
-        //translate the wasd keyboard (input) to real movement
-        for(Entity e : m_registry.inputs.getentities()){
-            if(!(m_registry.hasComponent<CVelocity>(e))) continue;
+        case GameState::Playing:{
+            //translate the wasd keyboard (input) to real movement
+            for(Entity e : m_registry.inputs.getentities()){
+                if(!(m_registry.hasComponent<CVelocity>(e))) continue;
 
-            auto& entity_input    = m_registry.getComponent<CInput>(e);
-            auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
-            auto& entity_transform = m_registry.getComponent<CTransform>(e);
-            
-            constexpr float player_speed = 200.0f;
-            entity_velocity.vx = 0;
-            if(entity_input.right){
-                entity_velocity.vx += player_speed;
-                entity_transform.facing_left = false;  // remember we are lookinh right
-            }
-            if(entity_input.left){
-                entity_velocity.vx -= player_speed;
-                entity_transform.facing_left = true;  // remember we are looking left     
-            }
-            
-            // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
-            // so if we want to move down we actually increase the y value 
-            constexpr float jump_power = -980.0f;
-            if(entity_input.up && entity_input.can_jump){
-                entity_velocity.vy    = jump_power;
-                entity_input.can_jump = false;
-                if(m_registry.hasComponent<CState>(e)){
-                    m_registry.getComponent<CState>(e).is_grounded = false;
-                }
-            }
-
-            //for variable jumb height
-            if(!entity_input.up && entity_velocity.vy < 0.0f){
-                entity_velocity.vy *= 0.5f; // for smooth stop not sudden
-            }
-
-        }
-
-        // add velocity to the position to move entities
-        for(Entity e : m_registry.velocities.getentities()){
-            if(!(m_registry.hasComponent<CTransform>(e))) continue;
-
-            auto& entity_transform = m_registry.getComponent<CTransform>(e);
-            auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
-
-            if(!m_registry.hasComponent<CLifespan>(e)){
-            entity_velocity.vy += m_gravity * dt;
-            
-            // you dont want to keep accelerating to the level that you bypass the floor
-            constexpr float max_fall_speed =  735.0f;
-            entity_velocity.vy = std::min(entity_velocity.vy, max_fall_speed);
-            }
-
-            entity_transform.x += entity_velocity.vx * dt;
-            entity_transform.y += entity_velocity.vy * dt;
-
-        }
-
-        // destroy bullets if they exoire thier ifesapn or hit an enemy
-        for(Entity bullet : m_registry.lifespans.getentities()){
-
-            auto& bul_life = m_registry.getComponent<CLifespan>(bullet);
-            bul_life.life_span -= dt;
-            if(bul_life.life_span <= 0.0f){
-                m_registry.destroyentity(bullet);
-                continue; // to stop processing the dead bullet and prevent hitting an enemy with dead bullet
-            }
-            if(!m_registry.hasComponent<CDamage>(bullet)) continue; 
-            if(m_registry.hasComponent<CHealth>(bullet)) continue; // thats a dead enemy 
-
-            for(Entity enemy : m_registry.healths.getentities()){
-                if(enemy == m_player) continue;
-
-                if(isColliding(bullet, enemy)){
-                    auto& enemy_health = m_registry.getComponent<CHealth>(enemy);
-                    auto& bullet_damage = m_registry.getComponent<CDamage>(bullet);
-                    enemy_health.health -= bullet_damage.damage;
-                    m_registry.destroyentity(bullet);
-
-                    if(enemy_health.health <= 0){
-                        if(!m_registry.hasComponent<CLifespan>(enemy)){
-                            // give it 1.5 seconds to play dead and then it destroys automatically because it now has a life span
-                            m_registry.addComponent(enemy, CLifespan{1.5f});
-                            m_registry.getComponent<CState>(enemy).current_state = "dead";
-                            m_registry.getComponent<CState>(enemy).is_locked = false;
-                        }
-                    }
-
-                    break; // to stop the bullet from damaging many enemies
-                }
-            }
-        }
-
-        // mele combat
-        if(m_registry.hasComponent<CState>(m_player)){
-            auto& player_state = m_registry.getComponent<CState>(m_player);
-            auto& player_transform = m_registry.getComponent<CTransform>(m_player);
-            auto& player_velocity = m_registry.getComponent<CVelocity>(m_player);
-            
-            if(!player_state.has_hit && player_state.current_state == "attack"){
-
-                float reach = 50.0f; // how far the imaginary sword gets
-                float sword_width = 100.0f;
-                float sword_height = 80.0f;
-
-
+                auto& entity_input    = m_registry.getComponent<CInput>(e);
+                auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+                auto& entity_transform = m_registry.getComponent<CTransform>(e);
                 
-                float sword_x = player_transform.facing_left ? (player_transform.x - reach) : (player_transform.x + reach);
-                float sword_y = player_transform.y;
+                constexpr float player_speed = 200.0f;
+                entity_velocity.vx = 0;
+                if(entity_input.right){
+                    entity_velocity.vx += player_speed;
+                    entity_transform.facing_left = false;  // remember we are lookinh right
+                }
+                if(entity_input.left){
+                    entity_velocity.vx -= player_speed;
+                    entity_transform.facing_left = true;  // remember we are looking left     
+                }
+                
+                // the (0,0) coordinates in sfml are in the top left and the y axis is downward 
+                // so if we want to move down we actually increase the y value 
+                constexpr float jump_power = -980.0f;
+                if(entity_input.up && entity_input.can_jump){
+                    entity_velocity.vy    = jump_power;
+                    entity_input.can_jump = false;
+                    if(m_registry.hasComponent<CState>(e)){
+                        m_registry.getComponent<CState>(e).is_grounded = false;
+                    }
+                }
 
+                //for variable jumb height
+                if(!entity_input.up && entity_velocity.vy < 0.0f){
+                    entity_velocity.vy *= 0.5f; // for smooth stop not sudden
+                }
+
+            }
+
+            // add velocity to the position to move entities
+            for(Entity e : m_registry.velocities.getentities()){
+                if(!(m_registry.hasComponent<CTransform>(e))) continue;
+
+                auto& entity_transform = m_registry.getComponent<CTransform>(e);
+                auto& entity_velocity = m_registry.getComponent<CVelocity>(e);
+
+                if(!m_registry.hasComponent<CLifespan>(e)){
+                entity_velocity.vy += m_gravity * dt;
+                
+                // you dont want to keep accelerating to the level that you bypass the floor
+                constexpr float max_fall_speed =  735.0f;
+                entity_velocity.vy = std::min(entity_velocity.vy, max_fall_speed);
+                }
+
+                entity_transform.x += entity_velocity.vx * dt;
+                entity_transform.y += entity_velocity.vy * dt;
+
+            }
+
+            // destroy bullets if they exoire thier ifesapn or hit an enemy
+            std::vector<Entity> bullets = m_registry.lifespans.getentities();
+            for(Entity bullet : bullets){
+                if(!m_registry.hasComponent<CLifespan>(bullet)) continue;
+
+                auto& bul_life = m_registry.getComponent<CLifespan>(bullet);
+                bul_life.life_span -= dt;
+                if(bul_life.life_span <= 0.0f){
+                    m_registry.destroyentity(bullet);
+                    continue; // to stop processing the dead bullet and prevent hitting an enemy with dead bullet
+                }
+                if(!m_registry.hasComponent<CDamage>(bullet)) continue; 
+                if(m_registry.hasComponent<CHealth>(bullet)) continue; // thats a dead enemy 
 
                 for(Entity enemy : m_registry.healths.getentities()){
                     if(enemy == m_player) continue;
 
-                    auto& enemy_BB = m_registry.getComponent<CBoundingBox>(enemy);
-                    auto& enemy_transform = m_registry.getComponent<CTransform>(enemy);
-
-                    // check is the imaginary box hit the enemy
-                    float diff_x = std::abs(sword_x - enemy_transform.x);
-                    float diff_y = std::abs(sword_y - enemy_transform.y);
-                    float min_x = (sword_width + enemy_BB.width) / 2.0f;
-                    float min_y = (sword_height + enemy_BB.height) / 2.0f;
-
-                    if(diff_x < min_x && diff_y < min_y){
+                    if(isColliding(bullet, enemy)){
                         auto& enemy_health = m_registry.getComponent<CHealth>(enemy);
-                        enemy_health.health -= m_registry.getComponent<CDamage>(m_player).damage;
-                        player_state.has_hit = true;
+                        auto& bullet_damage = m_registry.getComponent<CDamage>(bullet);
+                        enemy_health.health -= bullet_damage.damage;
+                        m_registry.destroyentity(bullet);
 
-                        if(enemy_health.health <= 0.0f){
+                        if(enemy_health.health <= 0){
                             if(!m_registry.hasComponent<CLifespan>(enemy)){
+                                // give it 1.5 seconds to play dead and then it destroys automatically because it now has a life span
                                 m_registry.addComponent(enemy, CLifespan{1.5f});
                                 m_registry.getComponent<CState>(enemy).current_state = "dead";
                                 m_registry.getComponent<CState>(enemy).is_locked = false;
-
                             }
                         }
-                        break; // save you time you already hiy one (unless you want to hit more in one splash)
-                    }
 
+                        break; // to stop the bullet from damaging many enemies
+                    }
                 }
             }
-            
-        }
-        if(m_registry.hasComponent<CHealth>(m_player)){
-            if(m_registry.getComponent<CHealth>(m_player).health <= 0.0f){
-                m_currentState = GameState::GameOver;
-            }
-        }
-        break;
 
-        case GameState::MainMenu:
+            // melee combat
+            if(m_registry.hasComponent<CState>(m_player)){
+                auto& player_state = m_registry.getComponent<CState>(m_player);
+                auto& player_transform = m_registry.getComponent<CTransform>(m_player);
+                auto& player_velocity = m_registry.getComponent<CVelocity>(m_player);
+                
+                if(!player_state.has_hit && player_state.current_state == "attack"){
+
+                    float reach = 50.0f; // how far the imaginary sword gets
+                    float sword_width = 100.0f;
+                    float sword_height = 80.0f;
+
+
+                    
+                    float sword_x = player_transform.facing_left ? (player_transform.x - reach) : (player_transform.x + reach);
+                    float sword_y = player_transform.y;
+
+
+                    for(Entity enemy : m_registry.healths.getentities()){
+                        if(enemy == m_player) continue;
+
+                        auto& enemy_BB = m_registry.getComponent<CBoundingBox>(enemy);
+                        auto& enemy_transform = m_registry.getComponent<CTransform>(enemy);
+
+                        // check is the imaginary box hit the enemy
+                        float diff_x = std::abs(sword_x - enemy_transform.x);
+                        float diff_y = std::abs(sword_y - enemy_transform.y);
+                        float min_x = (sword_width + enemy_BB.width) / 2.0f;
+                        float min_y = (sword_height + enemy_BB.height) / 2.0f;
+
+                        if(diff_x < min_x && diff_y < min_y){
+                            auto& enemy_health = m_registry.getComponent<CHealth>(enemy);
+                            enemy_health.health -= m_registry.getComponent<CDamage>(m_player).damage;
+                            player_state.has_hit = true;
+
+                            if(enemy_health.health <= 0.0f){
+                                if(!m_registry.hasComponent<CLifespan>(enemy)){
+                                    m_registry.addComponent(enemy, CLifespan{1.5f});
+                                    m_registry.getComponent<CState>(enemy).current_state = "dead";
+                                    m_registry.getComponent<CState>(enemy).is_locked = false;
+
+                                }
+                            }
+                            break; // save you time you already hiy one (unless you want to hit more in one splash)
+                        }
+
+                    }
+                }
+                
+            }
+            if(m_registry.hasComponent<CHealth>(m_player)){
+                if(m_registry.getComponent<CHealth>(m_player).health <= 0.0f){
+                    m_currentState = GameState::GameOver;
+                }
+            }
+            break;
+        }
+
+        case GameState::MainMenu:{
         //game logic is paused in the menu 
         break;
+        }
 
-        case GameState::GameOver:
+        case GameState::GameOver:{
         //the player is dead we just wait to click on restart
         break;
+        }
 
     }
 }
@@ -585,7 +592,7 @@ void Engine::sRender(){
 
             //center the camera on the player
             //360 on y to lock the camera on the y so it doesnot bounce with jumps
-            camera.setCenter(player_position.x, 360.0f);
+            camera.setCenter(player_position.x,360.0f);
 
             m_window->setView(camera);
         }
@@ -746,10 +753,17 @@ void Engine::load_level(const std::string& path){
                         Entity Brick = m_registry.createentity();
                         m_registry.addComponent(Brick, CTransform{center_x, center_y});
                         m_registry.addComponent(Brick, CBoundingBox{grid_size, grid_size});
-                        m_registry.addComponent(Brick, CSprite{"tex_brick"});
+                        m_registry.addComponent(Brick, CSprite{"tex_grass"});
                         gridRow.push_back(1);
-                    } else{
-                        gridRow.push_back(0);
+                    } else if(entity_to_load == 'G'){
+                    
+                        Entity Brick = m_registry.createentity();
+                        m_registry.addComponent(Brick, CTransform{center_x, center_y});
+                        m_registry.addComponent(Brick, CBoundingBox{grid_size, grid_size});
+                        m_registry.addComponent(Brick, CSprite{"tex_ground"});
+                        gridRow.push_back(1); // to let A* knows its a solid object
+                    }else{
+                        gridRow.push_back(0); // to let it know its an empty space
                     }
 
                     if(entity_to_load == 'P'){
@@ -778,17 +792,16 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(Enemy, CDamage{15.0f});
                     }
                     if(entity_to_load == 'F'){
-                        // should have been a flying enemy but iam too lazy to get a new texture for these guyes
                         Entity Enemy = m_registry.createentity();
                         m_registry.addComponent(Enemy, CTransform{center_x, center_y});
-                        m_registry.addComponent(Enemy, CHealth{100.0f});
-                        m_registry.addComponent(Enemy, CBoundingBox{40.f, 40.f});
+                        m_registry.addComponent(Enemy, CHealth{100.0f}); 
+                        m_registry.addComponent(Enemy, CBoundingBox{50.f, 50.f}); 
                         m_registry.addComponent(Enemy, CVelocity{0.0f, 0.0f});
-                        m_registry.addComponent(Enemy, CSprite{"tex_enemy_idle", 0, 0, 24, 32});
-                        m_registry.addComponent(Enemy, CAnimation{11, 0.2f, 0, 0, 24});
+                        m_registry.addComponent(Enemy, CSprite{"flying_enemy_tex", 59, 33, 65, 62});
+                        m_registry.addComponent(Enemy, CAnimation{15, 0.1f, 59, 33, 192}); 
                         m_registry.addComponent(Enemy, CState{"idle"});
                         m_registry.addComponent(Enemy, CAI{{}, 0, 0.0f, true});        
-                        m_registry.addComponent(Enemy, CDamage{15.0f});                
+                        m_registry.addComponent(Enemy, CDamage{20.0f});       
                     }
                 }
                 m_navGrid.push_back(gridRow);
@@ -846,7 +859,28 @@ void Engine::sAnimation(float dt){
 
         // apply new sprites if state has changed
         // check if sprite name matches the state to know if we need to swap
-        if(entity_sprit.name.find(new_state) == std::string::npos || (new_state == "attack" && entity_animation.current_frame == 0)){
+        std::string check_state = new_state;
+        if (check_state == "patrol") check_state = "idle"; // Skeletons use the idle sprite to patrol
+
+        bool needs_update = false;
+
+        // Logic (Check Y-coordinates instead of string names)
+        if (entity_sprit.name == "flying_enemy_tex") {
+            if (new_state == "idle"   && entity_animation.start_pixel_y != 33)  needs_update = true;
+            if (new_state == "patrol" && entity_animation.start_pixel_y != 33)  needs_update = true;
+            if (new_state == "chase"  && entity_animation.start_pixel_y != 257) needs_update = true;
+            if (new_state == "attack" && entity_animation.start_pixel_y != 365) needs_update = true;
+            if (new_state == "dead"   && entity_animation.start_pixel_y != 706) needs_update = true;
+        } 
+        // Player & Skeleton Logic (Use the string .find() trick)
+        else {
+            if (entity_sprit.name.find(check_state) == std::string::npos) {
+                needs_update = true;
+            }
+        }
+
+        // apply new sprites if state has changed
+        if(needs_update || (new_state == "attack" && entity_animation.current_frame == 0)){
 
             entity_state.current_state = new_state;
             entity_state.has_hit = false;
@@ -887,24 +921,46 @@ void Engine::sAnimation(float dt){
                     m_registry.getComponent<CTransform>(attack_effect).facing_left = player_tra.facing_left;
                     
                 }
-            } else{ 
-                if(new_state == "idle" || new_state == "patrol"){
-                    entity_sprit = CSprite{"tex_enemy_idle", 0, 0, 24, 32};
-                    entity_animation = CAnimation{11, 0.2f, 0, 0, 24};
-                }
-                if(new_state == "chase"){
-                    entity_sprit = CSprite{"tex_enemy_chase", 0, 0, 22, 33};
-                    entity_animation = CAnimation{13, 0.2f, 0, 0, 22};
-                } 
-                if(new_state == "attack"){
-                    entity_sprit = CSprite{"tex_enemy_attack", 0, 0, 43, 37};
-                    entity_animation = CAnimation{18, 0.1f, 0, 0, 43};
-                    entity_state.is_locked = true;
-                }
-                if(new_state == "dead"){
-                    entity_sprit = CSprite{"tex_enemy_dead", 0, 0, 33, 32};
-                    entity_animation = CAnimation{15, 0.1f, 0, 0, 33};
-                }
+            } else{
+
+                if(!m_registry.getComponent<CAI>(e).is_flying){
+                    if(new_state == "idle" || new_state == "patrol"){
+                        entity_sprit = CSprite{"tex_enemy_idle", 0, 0, 24, 32};
+                        entity_animation = CAnimation{11, 0.2f, 0, 0, 24};
+                    }
+                    if(new_state == "chase"){
+                        entity_sprit = CSprite{"tex_enemy_chase", 0, 0, 22, 33};
+                        entity_animation = CAnimation{13, 0.2f, 0, 0, 22};
+                    } 
+                    if(new_state == "attack"){
+                        entity_sprit = CSprite{"tex_enemy_attack", 0, 0, 43, 37};
+                        entity_animation = CAnimation{18, 0.1f, 0, 0, 43};
+                        entity_state.is_locked = true;
+                    }
+                    if(new_state == "dead"){
+                        entity_sprit = CSprite{"tex_enemy_dead", 0, 0, 33, 32};
+                        entity_animation = CAnimation{15, 0.1f, 0, 0, 33};
+                    }
+                } else {
+                    if(new_state == "idle" || new_state == "patrol"){
+                        entity_sprit = CSprite{"flying_enemy_tex", 59, 33, 65, 62};
+                        entity_animation =  CAnimation{15, 0.1f, 59, 33, 192};
+                    }
+                    if(new_state == "chase"){
+                        entity_sprit = CSprite{"flying_enemy_tex", 47, 257, 97,62};
+                        entity_animation =  CAnimation{6, 0.2f, 47, 257, 192};
+                    } 
+                    if(new_state == "attack"){
+                        entity_sprit = CSprite{"flying_enemy_tex", 69, 365, 100, 63};
+                        entity_animation =  CAnimation{7, 0.25f, 69, 365, 192};
+                        entity_state.is_locked = true;
+                    }
+                    if(new_state == "dead"){
+                        entity_sprit = CSprite{"flying_enemy_tex", 63, 706, 81, 62};
+                        entity_animation =  CAnimation{11, 0.14f, 63, 706, 192};
+                    }
+ 
+                }    
 
             }
             // updateEntitySpriteAndAnimation(e, new_state); // Helpful helper function to clean up code (to be added later if i survived this)
