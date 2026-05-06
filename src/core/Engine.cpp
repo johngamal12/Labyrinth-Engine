@@ -350,19 +350,14 @@ void Engine::sCollision(){
             // entity_transform.y = std::clamp(entity_transform.y, half_height, window_y - half_height);
             
             // treat the last pixel in the y axes as a floor
-            float floor = window_y - half_height;
-            if(entity_transform.y  >= floor){
-                entity_transform.y = floor;
-                
-                if(m_registry.hasComponent<CVelocity>(e)){
-                    m_registry.getComponent<CVelocity>(e).vy = 0.0f;
+            // If anything falls off the bottom of the giant map, kill it!
+            if(entity_transform.y > 3000.0f){
+                if (e == m_player) {
+                    m_currentState = GameState::GameOver;
+                } else {
+                    m_registry.destroyentity(e);
                 }
-                if(m_registry.hasComponent<CInput>(e)){
-                    m_registry.getComponent<CInput>(e).can_jump = true;
-                }
-                if(m_registry.hasComponent<CState>(e)){
-                    m_registry.getComponent<CState>(e).is_grounded = true;
-                }
+                continue; // Skip the rest of collision for this frame
             }
         }
         // check for collisions between an entity and other entities
@@ -592,7 +587,7 @@ void Engine::sRender(){
 
             //center the camera on the player
             //360 on y to lock the camera on the y so it doesnot bounce with jumps
-            camera.setCenter(player_position.x,360.0f);
+            camera.setCenter(player_position.x,player_position.y);
 
             m_window->setView(camera);
         }
