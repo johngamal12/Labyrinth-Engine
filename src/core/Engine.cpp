@@ -7,6 +7,7 @@
 #include <vector>
 #include <imgui.h>
 #include <imgui-SFML.h>
+#include "DatabaseManager.hpp"
 
 
 Engine::Engine(){
@@ -21,6 +22,8 @@ Engine::Engine(){
     m_isrunning = true;
 
     //loading the heavy assest into ram once
+    DatabaseManager::getInstance().connect("data/GameData (1).db");
+    DatabaseManager::getInstance().initSchema();
 
     m_assets.addtexture("tex_player_idle", "game_assets/player_spriteshhets/Idle.png");
     m_assets.addtexture("tex_player_jump", "game_assets/player_spriteshhets/Jump.png");
@@ -130,7 +133,53 @@ void Engine::sUserInput(){
         }
 
     }
+// F5: Save Game
+            if(event.key.code == sf::Keyboard::F5) {
+                if(m_player != -1 && m_registry.hasComponent<CTransform>(m_player) && m_registry.hasComponent<CHealth>(m_player)) {
+                    
+                    auto& pTransform = m_registry.getComponent<CTransform>(m_player);
+                    auto& pHealth = m_registry.getComponent<CHealth>(m_player);
 
+                    PlayerSaveData saveData;
+                    saveData.saveID = 1;               
+                    saveData.classID = 1;              
+                    saveData.currentLevel = 1;         // NEW: Set this to match the DB!
+                    saveData.currentHealth = pHealth.health; 
+                    saveData.playerX = pTransform.x;   
+                    saveData.playerY = pTransform.y;   
+                    saveData.dungeonFloor = 1;
+
+                    if (DatabaseManager::getInstance().savePlayerState(saveData)) {
+                        std::cout << "-> GAME SAVED TO DATABASE SUCCESSFULLY!\n";
+                    }
+                }
+            }
+
+            // F9: Load Game
+            if(event.key.code == sf::Keyboard::F9) {
+                PlayerSaveData loadedData = DatabaseManager::getInstance().loadPlayerState(1);
+                
+                if(loadedData.saveID != 0 && m_player != -1) {
+                    auto& pTransform = m_registry.getComponent<CTransform>(m_player);
+                    auto& pHealth = m_registry.getComponent<CHealth>(m_player);
+
+                    pTransform.x = loadedData.playerX;
+                    pTransform.y = loadedData.playerY;
+                    pHealth.health = loadedData.currentHealth;
+
+                    // --- THE FIX: Wipe out falling momentum! ---
+                    if (m_registry.hasComponent<CVelocity>(m_player)) {
+                        m_registry.getComponent<CVelocity>(m_player).vx = 0.0f;
+                        m_registry.getComponent<CVelocity>(m_player).vy = 0.0f;
+                    }
+
+                    std::cout << "-> GAME LOADED FROM DATABASE SUCCESSFULLY! Welcome back.\n";
+                } else {
+                    std::cout << "-> NO SAVE FILE FOUND!\n";
+                }
+            }
+            
+  
 }
 
 // we pass dt to the update function because if for some reason the machine is not good enough to produce 60 fps at least the movement stays the same
@@ -667,11 +716,37 @@ void Engine::sRender(){
         ImGui::End();
 
     }
+          // ==========================================
+    // AI DEBUG RENDERING (Temporary Testing Code)
+    // ==========================================
+    for (Entity e : m_registry.ais.getentities()) {
+        // Make sure we only draw for enemies that actually have an active path
+        auto& enemy_ai = m_registry.getComponent<CAI>(e);
+        
+        if (enemy_ai.waypoints.empty()) continue;
+
+        // Draw a small red box for every node in the current path
+        for (size_t i = enemy_ai.current_waypoint; i < enemy_ai.waypoints.size(); i++) {
+            const CGridPos& node = enemy_ai.waypoints[i];
+
+            sf::RectangleShape debugSquare(sf::Vector2f(10.0f, 10.0f));
+            debugSquare.setFillColor(sf::Color::Red);
+            debugSquare.setOrigin(5.0f, 5.0f); // Center the origin
+
+            // Convert the grid integer back to world float coordinates
+            float world_x = (node.col * 40.0f) + 20.0f; // 40.0f is grid size, 20.0f is half_grid
+            float world_y = (node.row * 40.0f) + 20.0f;
+            
+            debugSquare.setPosition(world_x, world_y);
+            m_window->draw(debugSquare);
+        }
+    }
 
     //imgui hook render
     ImGui::SFML::Render(*m_window);
     // third push the drawn frame to the window 
     m_window->display();
+    
 
 }
 
@@ -1268,9 +1343,10 @@ std::vector<CGridPos> Engine::calculatePath(CGridPos start, CGridPos target){
     CPathNode startNode{start.col, start.row, 0.0f, 0.0f, 0.0f, nullptr};
     openList.push(startNode);
 
-    // up, down, left, right
-    int dRow[] = {-1, 1, 0, 0};
-    int dCol[] = {0, 0, -1, 1};
+    // up, down, left, right and diagonals
+    int dRow[] = {-1, 1, 0, 0, -1, -1, 1, 1};
+    int dCol[] = {0, 0, -1, 1, -1, 1, -1, 1};
+    float move_cost[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.414f, 1.414f, 1.414f, 1.414f};
 
     while (!openList.empty()) {
         CPathNode current = openList.top();
@@ -1290,7 +1366,7 @@ std::vector<CGridPos> Engine::calculatePath(CGridPos start, CGridPos target){
         if(closedList[current.y][current.x]) continue;
         closedList[current.y][current.x] = true;
 
-        for(int i = 0; i < 4; i++) {
+        for(int i = 0; i < 8; i++) {
             int newCol = current.x + dCol[i];
             int newRow = current.y + dRow[i];
 
@@ -1303,7 +1379,7 @@ std::vector<CGridPos> Engine::calculatePath(CGridPos start, CGridPos target){
                     // now its safe to check the vector
                     if(m_navGrid[newRow][newCol] == 0 && !closedList[newRow][newCol]){
                         
-                        float gCost = current.gCost + 1.0f;
+                        float gCost = current.gCost + move_cost[i];
                         float hCost = std::abs(newCol - target.col) + std::abs(newRow - target.row);
                         float fCost = gCost + hCost;
 

@@ -91,8 +91,8 @@ add_executable(EatMeat
     src/main.cpp
     src/core/Engine.cpp
     src/core/AssetManager.cpp
+    src/core/DatabaseManager.cpp
     # src/core/Registry.cpp
-    # src/core/DatabaseManager.cpp
     # src/core/MapManager.cpp
     # src/systems/MovementSystem.cpp
     # src/systems/CombatSystem.cpp
