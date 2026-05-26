@@ -84,7 +84,7 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(Enemy, CSprite{"tex_enemy_idle", 0, 0, 24, 32});
                         m_registry.addComponent(Enemy, CAnimation{11, 0.2f, 0, 0, 24});
                         m_registry.addComponent(Enemy, CState{"idle"});
-                        m_registry.addComponent(Enemy, CAI{});
+                        m_registry.addComponent(Enemy, C_AI{});
                         m_registry.addComponent(Enemy, CDamage{15.0f});
                     }
                     if(entity_to_load == 'F'){
@@ -96,7 +96,7 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(Enemy, CSprite{"flying_enemy_tex", 59, 33, 65, 62});
                         m_registry.addComponent(Enemy, CAnimation{15, 0.1f, 59, 33, 192}); 
                         m_registry.addComponent(Enemy, CState{"idle"});
-                        m_registry.addComponent(Enemy, CAI{{}, 0, 0.0f, true});        
+                        m_registry.addComponent(Enemy, C_AI{{}, 0, 0.0f, true});        
                         m_registry.addComponent(Enemy, CDamage{20.0f});       
                     }
                 }

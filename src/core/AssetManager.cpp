@@ -1,6 +1,7 @@
 #include "AssetManager.hpp"
 #include <iostream>
 
+
 AssetManager::AssetManager() = default;
 AssetManager::~AssetManager() = default;
 

@@ -9,7 +9,6 @@
 #include <imgui-SFML.h>
 #include "DatabaseManager.hpp"
 
-
 Engine::Engine(){
     // first initialize the window once we run the programm
     m_window = std::make_unique<sf::RenderWindow>(sf::VideoMode(1280,720),"game Eat Meat");
@@ -40,7 +39,20 @@ Engine::Engine(){
     m_assets.addtexture("tex_background", "game_assets/Image.png");
     m_assets.addtexture("tex_attack_effect", "game_assets/PunchImp1.png");
     m_assets.addtexture("flying_enemy_tex", "game_assets/cthulu_192x112_SpriteSheet.png");
+
+    m_sounds.addsound("music_level02", "game_assets/sounds/504_Privy_Council.mp3");
+    m_sounds.addsound("sfx_player_attack", "game_assets/sounds/sfx_attack_sword_001.wav");
+    m_sounds.addsound("sfx_player_jump", "game_assets/sounds/Wood Chain Jump.wav");
+    m_sounds.addsound("sfx_player_death", "game_assets/sounds/death_10_alex.wav");
+    m_sounds.addsound("sfx_player_take_damage", "game_assets/sounds/getting_hit_alex.wav");
+    m_sounds.addsound("sfx_enemy_take_damage", "game_assets/sounds/Sword Impact Hit 2.wav");
+    m_sounds.addsound("sfx_enemy_death", "game_assets/sounds/large-monster-death-01.wav");
+    m_sounds.addsound("sfx_player_shooting", "game_assets/sounds/Fireball 1.wav");
+    m_sounds.addsound("sfx_enemy_attack", "game_assets/sounds/15_Impact_flesh_02.wav");
+
     load_level("rooms/level02.yaml");
+    m_sounds.playmusic("music_level02");
+
     std::cout<<"Engine started succefully";
 
 }
@@ -48,6 +60,7 @@ Engine::Engine(){
 // destructor is needed because we used unique pointer with forward declaration requires a predifined destructor in the .cpp where the full type is known
 Engine::~Engine() {
     ImGui::SFML::Shutdown(); // imgui hook shutdown
+
  }
 
 // the core heartbeat of the game once this called the game keeps running until until you quite

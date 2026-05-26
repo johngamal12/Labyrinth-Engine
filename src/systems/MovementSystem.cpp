@@ -37,6 +37,7 @@ void Engine::sUpdate(float dt){
                     if(m_registry.hasComponent<CState>(e)){
                         m_registry.getComponent<CState>(e).is_grounded = false;
                     }
+                    m_sounds.playsound("sfx_player_jump");
                 }
 
                 //for variable jumb height
@@ -107,7 +108,6 @@ void Engine::sUpdate(float dt){
             if(m_registry.hasComponent<CState>(m_player)){
                 auto& player_state = m_registry.getComponent<CState>(m_player);
                 auto& player_transform = m_registry.getComponent<CTransform>(m_player);
-                auto& player_velocity = m_registry.getComponent<CVelocity>(m_player);
                 
                 if(!player_state.has_hit && player_state.current_state == "attack"){
 
@@ -115,8 +115,6 @@ void Engine::sUpdate(float dt){
                     float sword_width = 100.0f;
                     float sword_height = 80.0f;
 
-
-                    
                     float sword_x = player_transform.facing_left ? (player_transform.x - reach) : (player_transform.x + reach);
                     float sword_y = player_transform.y;
 
@@ -143,9 +141,11 @@ void Engine::sUpdate(float dt){
                                     m_registry.addComponent(enemy, CLifespan{1.5f});
                                     m_registry.getComponent<CState>(enemy).current_state = "dead";
                                     m_registry.getComponent<CState>(enemy).is_locked = false;
+                                    m_sounds.playsound("sfx_enemy_death");
 
                                 }
                             }
+                            m_sounds.playsound("sfx_enemy_take_damage");
                             break; // save you time you already hiy one (unless you want to hit more in one splash)
                         }
 
@@ -153,11 +153,7 @@ void Engine::sUpdate(float dt){
                 }
                 
             }
-            if(m_registry.hasComponent<CHealth>(m_player)){
-                if(m_registry.getComponent<CHealth>(m_player).health <= 0.0f){
-                    m_currentState = GameState::GameOver;
-                }
-            }
+
             break;
         }
 

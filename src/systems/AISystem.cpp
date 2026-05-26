@@ -26,14 +26,14 @@ void Engine::sAI(float dt){
                 // if the enemy is dead stop thinking
                 if(enemy_state.current_state == "dead"){
                     enemy_velocity.vx = 0.0f;
-                    if(m_registry.getComponent<CAI>(e).is_flying){
+                    if(m_registry.getComponent<C_AI>(e).is_flying){
                         enemy_velocity.vy = 0.0f - (m_gravity * dt);
                     }
                     continue;
                 }
 
                 // fetch ai component so we can sore the path
-                auto& enemy_ai = m_registry.getComponent<CAI>(e);
+                auto& enemy_ai = m_registry.getComponent<C_AI>(e);
                 if(!m_registry.hasComponent<CBoundingBox>(e)) continue;
                 auto& enemy_bb = m_registry.getComponent<CBoundingBox>(e);
 
@@ -159,6 +159,7 @@ void Engine::sAI(float dt){
                         enemy_velocity.vy = 0.0f - (m_gravity * dt);
                         enemy_ai.attack_timer -= dt;
                         if(enemy_ai.attack_timer <= 0.0f){
+
                             // imaginary bounding box
                             float reach = 40.0f;
                             float weapon_height = 50.0f;
@@ -188,7 +189,9 @@ void Engine::sAI(float dt){
                             if(diff_x_hit < min_x && diff_y_hit < min_y){
                                 auto& enemy_damage = m_registry.getComponent<CDamage>(e).damage;
                                 m_registry.getComponent<CHealth>(m_player).health -= enemy_damage;
+                                m_sounds.playsound("sfx_player_take_damage");
                             }
+                            m_sounds.playsound("sfx_enemy_attack");
                             // reset the timer so the enemy dont spam damage
                             enemy_ai.attack_timer = 2.0f;
                         }
@@ -279,18 +282,16 @@ void Engine::sAI(float dt){
 
                         if(diff_x_hit < min_x && diff_y_hit < min_y){
                             m_registry.getComponent<CHealth>(m_player).health -= m_registry.getComponent<CDamage>(e).damage;
+                            m_sounds.playsound("sfx_player_take_damage");
                         }
+                        m_sounds.playsound("sfx_enemy_attack");
                         enemy_ai.attack_timer = 2.0f;
                     }
                 }
 
             }
         }
-        if(m_registry.hasComponent<CHealth>(m_player)){
-            if(m_registry.getComponent<CHealth>(m_player).health <= 0.0f){
-                m_currentState = GameState::GameOver;
-            }
-        }
+
         break;
         }
 

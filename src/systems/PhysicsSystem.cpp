@@ -20,12 +20,12 @@ void Engine::sCollision(){
 
             auto& entity_transform = m_registry.getComponent<CTransform>(e);
             auto& entity_bounding_box = m_registry.getComponent<CBoundingBox>(e);
-            constexpr float window_y = 720.0f; 
-
+            
             //here is the potimized function of c++
             const float half_width  = (entity_bounding_box.width / 2.0f);
-            const float half_height = (entity_bounding_box.height/ 2.0f);
-
+            
+            // constexpr float window_y = 720.0f; 
+            // const float half_height = (entity_bounding_box.height/ 2.0f);
             // if needed feature
             // stop entities from getting stuck when they hit the wall (allow for bing bong like mechanics)
             // if(m_registry.hasComponent<CVelocity>(e)){
@@ -136,8 +136,8 @@ void Engine::sCollision(){
                         }  
                     } else
                     { 
-                        bool A_is_flying = m_registry.hasComponent<CAI>(entity_A) && m_registry.getComponent<CAI>(entity_A).is_flying;
-                        bool B_is_flying = m_registry.hasComponent<CAI>(entity_B) && m_registry.getComponent<CAI>(entity_B).is_flying;
+                        bool A_is_flying = m_registry.hasComponent<C_AI>(entity_A) && m_registry.getComponent<C_AI>(entity_A).is_flying;
+                        bool B_is_flying = m_registry.hasComponent<C_AI>(entity_B) && m_registry.getComponent<C_AI>(entity_B).is_flying;
 
                         if(a_can_move && b_can_move)
                         {
@@ -207,6 +207,7 @@ void Engine::sCollision(){
         }
         if(m_registry.hasComponent<CHealth>(m_player)){
             if(m_registry.getComponent<CHealth>(m_player).health <= 0.0f){
+                m_sounds.playsound("sfx_player_death");
                 m_currentState = GameState::GameOver;
             }
         }
@@ -270,7 +271,7 @@ void Engine::sSpawnBullet(Entity creator, float position_mouse_x, float position
         m_registry.addComponent(bullet, CBoundingBox{10.0f, 10.0f});
         m_registry.addComponent(bullet, CLifespan{2.0f});
         m_registry.addComponent(bullet, CDamage{20.f});
-        m_registry.addComponent(bullet, CSprite{"tex_bullet", 117, 53, 7, 5});
+        m_registry.addComponent(bullet, CSprite{"tex_bullet", 117, 53, 7, 5, 30, 30});
 
     }
 }

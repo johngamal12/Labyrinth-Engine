@@ -24,7 +24,7 @@ class Registry {
         SparseSet<CSprite> sprites;
         SparseSet<CAnimation> animations;
         SparseSet<CState> states;
-        SparseSet<CAI> ais;
+        SparseSet<C_AI> ais;
 
         Entity createentity(){
             if(!m_reusableIDs.empty()){
@@ -104,7 +104,7 @@ class Registry {
             animations.insert(e, std::move(component));
         } else if constexpr (std::is_same_v<T, CState>){
             states.insert(e, std::move(component));
-        } else if constexpr (std::is_same_v<T, CAI>){
+        } else if constexpr (std::is_same_v<T, C_AI>){
             ais.insert(e, std::move(component));
         }  else{
             static_assert(sizeof(T) == 0, "Unknown component type add it to addComponent template");
@@ -133,7 +133,7 @@ class Registry {
             return animations.get(e);
         } else if constexpr (std::is_same_v<T, CState>){
             return states.get(e);
-        } else if constexpr (std::is_same_v<T, CAI>){
+        } else if constexpr (std::is_same_v<T, C_AI>){
             return ais.get(e);
         } else {
         static_assert(sizeof(T) == 0, "Unknown component type add it to getComponent template");
@@ -162,7 +162,7 @@ class Registry {
             return animations.has(e);
         } else if constexpr (std::is_same_v<T, CState>){
             return states.has(e);
-        } else if constexpr (std::is_same_v<T, CAI>){
+        } else if constexpr (std::is_same_v<T, C_AI>){
             return ais.has(e);
         }
         return false;

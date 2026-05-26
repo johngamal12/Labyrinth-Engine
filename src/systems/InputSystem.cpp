@@ -51,6 +51,8 @@ void Engine::sUserInput(){
                 // you need to get the world position of the mouse because the relative position of the window will give wrong decisions when you move a distance by the window size
                 sf::Vector2f mouse_world = m_window->mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
                 sSpawnBullet(m_player, mouse_world.x, mouse_world.y);
+                m_sounds.playsound("sfx_player_shooting");
+                
 
             }
 

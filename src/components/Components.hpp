@@ -65,17 +65,24 @@ struct CSprite{
     int tex_y = 0;
     int tex_w = 0;
     int tex_h = 0;
+
+    // visual display size (indepensent of bounding box size) could be more effiecnt if been put to CAnimation but if we would like in the future to have sprites with bounding box size diffrence thats a good tradeoff
+    int display_w = 0;
+    int display_h = 0;
+
     //default constructor are fine 
     CSprite() = default;
     // coonstructor for full image
     CSprite(const std::string& spritename) : name(spritename){}
     //constructor for sprite sheets
-    CSprite(const std::string& spritename, int x, int y, int w, int h){
+    CSprite(const std::string& spritename, int x, int y, int w, int h, int offset_w = 0, int offset_h = 0){
         name = spritename;
         tex_x = x;
         tex_y = y;
         tex_w = w;
         tex_h = h;
+        display_w = offset_w;
+        display_w = offset_h;
     }
 };
 
@@ -130,9 +137,7 @@ struct CGridPos{
     }
 };
 
-
-
-struct CAI{
+struct C_AI{
     std::vector<CGridPos> waypoints;
     size_t current_waypoint = 0;
     float path_update_timer = 0.0f;

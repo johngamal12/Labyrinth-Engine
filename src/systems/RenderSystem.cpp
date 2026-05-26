@@ -73,9 +73,12 @@ void Engine::sRender(){
                 texture_bounds.height = entity_sprite.tex_h;
             }
 
-            // calculate the exact scale needed to match the physical bounding box
-            float scale_x = entity_boundingbox.width  / texture_bounds.width;
-            float scale_y = entity_boundingbox.height / texture_bounds.height;
+            float target_w = (entity_sprite.display_w > 0) ? entity_sprite.display_w : entity_boundingbox.width ;
+            float target_h = (entity_sprite.display_h > 0) ? entity_sprite.display_h : entity_boundingbox.height;
+
+            // calculate the exact scale needed to match the physical bounding box or bigger if needed
+            float scale_x = target_w  / texture_bounds.width;
+            float scale_y = target_h / texture_bounds.height;
 
             if(entity_transform.facing_left){
                 scale_x *= -1;
@@ -124,7 +127,7 @@ void Engine::sRender(){
     // ==========================================
     for (Entity e : m_registry.ais.getentities()) {
         // Make sure we only draw for enemies that actually have an active path
-        auto& enemy_ai = m_registry.getComponent<CAI>(e);
+        auto& enemy_ai = m_registry.getComponent<C_AI>(e);
         
         if (enemy_ai.waypoints.empty()) continue;
 
@@ -156,7 +159,7 @@ void Engine::sRender(){
 
 
 void Engine::sAnimation(float dt){
-      // FSM animations
+    // FSM animations
     for(Entity e : m_registry.states.getentities()){
         if(!m_registry.hasComponent<CAnimation>(e) || !m_registry.hasComponent<CSprite>(e) || !m_registry.hasComponent<CVelocity>(e)) continue;
         auto& entity_state = m_registry.getComponent<CState>(e);
@@ -226,23 +229,23 @@ void Engine::sAnimation(float dt){
             entity_state.has_hit = false;
             if(e == m_player){
                 if(new_state == "idle"){
-                    entity_sprit = CSprite{"tex_player_idle", 66, 57, 38, 43};
+                    entity_sprit = CSprite{"tex_player_idle", 66, 57, 38, 43, 75, 75};
                     entity_animation = CAnimation{10, .2f, 66, 57, 162};
                 }
                 if(new_state == "run"){
-                    entity_sprit = CSprite{"tex_player_run", 52, 58, 51, 43};
+                    entity_sprit = CSprite{"tex_player_run", 52, 58, 51, 43, 100, 89};
                     entity_animation = CAnimation{8, .2f, 52, 58, 162};
                 }
                 if(new_state == "fall"){
-                    entity_sprit = CSprite{"tex_player_fall", 58, 35, 45, 66};
+                    entity_sprit = CSprite{"tex_player_fall", 58, 35, 45, 66, 89, 95};
                     entity_animation = CAnimation{3, .2f, 58, 35, 162};
                 }
                 if(new_state == "jump"){
-                    entity_sprit = CSprite{"tex_player_jump", 63, 59, 41, 44};
+                    entity_sprit = CSprite{"tex_player_jump", 63, 59, 41, 44, 81, 77};
                     entity_animation = CAnimation{3, .2f, 63, 59, 162};
                 }
                 if(new_state == "attack"){
-                    entity_sprit = CSprite{"tex_player_attack", 55, 45, 75, 55};
+                    entity_sprit = CSprite{"tex_player_attack", 55, 45, 75, 55, 148, 96};
                     entity_animation = CAnimation{7, .2f, 55, 45, 162};
                     entity_state.is_locked = true; // to stop player from spamming the attack if the animation didnot finish
 
@@ -259,11 +262,14 @@ void Engine::sAnimation(float dt){
                     m_registry.addComponent(attack_effect, CSprite{"tex_attack_effect", 11, 15, 48, 16});
                     m_registry.addComponent(attack_effect, CAnimation{5, 0.15f, 11, 15, 48});
                     m_registry.getComponent<CTransform>(attack_effect).facing_left = player_tra.facing_left;
+
+                    m_sounds.playsound("sfx_player_attack");
+
                     
                 }
             } else{
 
-                if(!m_registry.getComponent<CAI>(e).is_flying){
+                if(!m_registry.getComponent<C_AI>(e).is_flying){
                     if(new_state == "idle" || new_state == "patrol"){
                         entity_sprit = CSprite{"tex_enemy_idle", 0, 0, 24, 32};
                         entity_animation = CAnimation{11, 0.2f, 0, 0, 24};

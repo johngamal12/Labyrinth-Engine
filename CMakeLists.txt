@@ -92,12 +92,13 @@ add_executable(EatMeat
     src/core/Engine.cpp
     src/core/AssetManager.cpp
     src/core/DatabaseManager.cpp
+    src/core/MapManager.cpp
+    src/core/SoundManager.cpp
     src/systems/InputSystem.cpp
     src/systems/PhysicsSystem.cpp
     src/systems/AISystem.cpp
     src/systems/RenderSystem.cpp
     src/systems/MovementSystem.cpp
-    src/core/MapManager.cpp
     # src/core/Registry.cpp
     # src/systems/CombatSystem.cpp
 )
@@ -125,6 +126,8 @@ target_link_libraries(EatMeat PRIVATE
     ImGui-SFML::ImGui-SFML
     yaml-cpp
     sqlite3
+    -lwinmm    # Windows multimedia — required by miniaudio
+    -lole32    # COM — required by miniaudio on Windows
 )
 
 # ==========================================

@@ -1,6 +1,7 @@
 #pragma once
 #include "Registry.hpp"
 #include "AssetManager.hpp"
+#include "SoundManager.hpp"
 #include <memory>
 
 
@@ -31,6 +32,8 @@ class Engine{
         std::vector<std::vector<int>> m_navGrid; // 0-> empty , 1-> wall
         // tracting the state of the game
         GameState m_currentState = GameState::MainMenu;
+        // our sound system
+        SoundManager m_sounds;
 
 
         // the phases of our loop
