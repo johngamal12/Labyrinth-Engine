@@ -10,6 +10,7 @@ void Engine::sUserInput(){
     sf::Event event;
     // the logic for now is to close the window if the red cross clicked or the esc butoon pressed
     while(m_window->pollEvent(event)){
+
         // imgui hook prcess events
         ImGui::SFML::ProcessEvent(*m_window, event);
         // prevent player from shooting or moving if the mouse or keyboardis interacting with the imgui window
@@ -34,13 +35,15 @@ void Engine::sUserInput(){
             bool is_pressed = (event.type == sf::Event::KeyPressed);
 
             for(Entity e : m_registry.inputs.getentities()){
+                if(m_registry.hasComponent<CState>(e) && m_registry.getComponent<CState>(e).current_state != "dead"){
 
-                auto& entity_input = m_registry.getComponent<CInput>(e);
-                if(event.key.code == sf::Keyboard::W) entity_input.up          = is_pressed;
-                if(event.key.code == sf::Keyboard::S) entity_input.down        = is_pressed;
-                if(event.key.code == sf::Keyboard::D) entity_input.right       = is_pressed;
-                if(event.key.code == sf::Keyboard::A) entity_input.left        = is_pressed;
-                if(event.key.code == sf::Keyboard::Space)  entity_input.attack = is_pressed; 
+                    auto& entity_input = m_registry.getComponent<CInput>(e);
+                    if(event.key.code == sf::Keyboard::W) entity_input.up          = is_pressed;
+                    if(event.key.code == sf::Keyboard::S) entity_input.down        = is_pressed;
+                    if(event.key.code == sf::Keyboard::D) entity_input.right       = is_pressed;
+                    if(event.key.code == sf::Keyboard::A) entity_input.left        = is_pressed;
+                    if(event.key.code == sf::Keyboard::Space)  entity_input.attack = is_pressed; 
+                }
             }
             
         }

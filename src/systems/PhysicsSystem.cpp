@@ -205,12 +205,7 @@ void Engine::sCollision(){
             }
 
         }
-        if(m_registry.hasComponent<CHealth>(m_player)){
-            if(m_registry.getComponent<CHealth>(m_player).health <= 0.0f){
-                m_sounds.playsound("sfx_player_death");
-                m_currentState = GameState::GameOver;
-            }
-        }
+        
         break;
     }
 

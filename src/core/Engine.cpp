@@ -29,6 +29,7 @@ Engine::Engine(){
     m_assets.addtexture("tex_player_run", "game_assets/player_spriteshhets/Run.png");
     m_assets.addtexture("tex_player_fall", "game_assets/player_spriteshhets/Fall.png");
     m_assets.addtexture("tex_player_attack", "game_assets/player_spriteshhets/Attack1.png");
+    m_assets.addtexture("tex_player_dead", "game_assets/player_spriteshhets/Death.png");
     m_assets.addtexture("tex_enemy_idle", "game_assets/Skeleton-Idle.png");
     m_assets.addtexture("tex_enemy_chase", "game_assets/Skeleton-Walk.png");
     m_assets.addtexture("tex_enemy_attack", "game_assets/Skeleton-Attack.png");
@@ -49,6 +50,8 @@ Engine::Engine(){
     m_sounds.addsound("sfx_enemy_death", "game_assets/sounds/large-monster-death-01.wav");
     m_sounds.addsound("sfx_player_shooting", "game_assets/sounds/Fireball 1.wav");
     m_sounds.addsound("sfx_enemy_attack", "game_assets/sounds/15_Impact_flesh_02.wav");
+
+    m_assets.addshader("shd_flash", "game_assets/shaders/flash_white.frag");
 
     load_level("rooms/level02.yaml");
     m_sounds.playmusic("music_level02");
@@ -82,6 +85,7 @@ void Engine::run(){
         sUpdate(dt);
         sAI(dt);
         sCollision();
+        sHealth();
         sAnimation(dt);
         // phase 3 cleanup dead entities before showing in the window
         sCleanUp();

@@ -49,6 +49,7 @@ class Engine{
         void sAnimation(float dt);
         void sAI(float dt);
         std::vector<CGridPos> calculatePath(CGridPos start, CGridPos target);
+        void sHealth();
 
 
     public:

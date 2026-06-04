@@ -30,4 +30,4 @@ imgui.ini
 .zip
 
 # Ignore the miniaudio library
-.h
+miniaudio.h

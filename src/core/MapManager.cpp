@@ -73,6 +73,7 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(m_player, CAnimation{10, .2f, 66, 57, 162});
                         m_registry.addComponent(m_player, CState{"idle", false});
                         m_registry.addComponent(m_player, CDamage{50.0f});
+                        m_registry.addComponent(m_player, CShader{"shd_flash"});
                     }
 
                     if(entity_to_load == 'E'){
@@ -86,6 +87,8 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(Enemy, CState{"idle"});
                         m_registry.addComponent(Enemy, C_AI{});
                         m_registry.addComponent(Enemy, CDamage{15.0f});
+                        m_registry.addComponent(Enemy, CShader{"shd_flash"});
+
                     }
                     if(entity_to_load == 'F'){
                         Entity Enemy = m_registry.createentity();
@@ -97,7 +100,8 @@ void Engine::load_level(const std::string& path){
                         m_registry.addComponent(Enemy, CAnimation{15, 0.1f, 59, 33, 192}); 
                         m_registry.addComponent(Enemy, CState{"idle"});
                         m_registry.addComponent(Enemy, C_AI{{}, 0, 0.0f, true});        
-                        m_registry.addComponent(Enemy, CDamage{20.0f});       
+                        m_registry.addComponent(Enemy, CDamage{20.0f});
+                        m_registry.addComponent(Enemy, CShader{"shd_flash"}); 
                     }
                 }
                 m_navGrid.push_back(gridRow);

@@ -190,6 +190,9 @@ void Engine::sAI(float dt){
                                 auto& enemy_damage = m_registry.getComponent<CDamage>(e).damage;
                                 m_registry.getComponent<CHealth>(m_player).health -= enemy_damage;
                                 m_sounds.playsound("sfx_player_take_damage");
+                                if(m_registry.hasComponent<CState>(m_player)){
+                                    m_registry.getComponent<CState>(m_player).damage_flash_timer =  0.2f;
+                                }
                             }
                             m_sounds.playsound("sfx_enemy_attack");
                             // reset the timer so the enemy dont spam damage
@@ -283,6 +286,9 @@ void Engine::sAI(float dt){
                         if(diff_x_hit < min_x && diff_y_hit < min_y){
                             m_registry.getComponent<CHealth>(m_player).health -= m_registry.getComponent<CDamage>(e).damage;
                             m_sounds.playsound("sfx_player_take_damage");
+                            if(m_registry.hasComponent<CState>(m_player)){
+                                m_registry.getComponent<CState>(m_player).damage_flash_timer = 0.2f;
+                            }
                         }
                         m_sounds.playsound("sfx_enemy_attack");
                         enemy_ai.attack_timer = 2.0f;

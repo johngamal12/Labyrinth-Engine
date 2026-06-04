@@ -90,13 +90,8 @@ void Engine::sUpdate(float dt){
                         enemy_health.health -= bullet_damage.damage;
                         m_registry.destroyentity(bullet);
 
-                        if(enemy_health.health <= 0){
-                            if(!m_registry.hasComponent<CLifespan>(enemy)){
-                                // give it 1.5 seconds to play dead and then it destroys automatically because it now has a life span
-                                m_registry.addComponent(enemy, CLifespan{1.5f});
-                                m_registry.getComponent<CState>(enemy).current_state = "dead";
-                                m_registry.getComponent<CState>(enemy).is_locked = false;
-                            }
+                        if(m_registry.hasComponent<CState>(enemy)){
+                            m_registry.getComponent<CState>(enemy).damage_flash_timer = 0.15;
                         }
 
                         break; // to stop the bullet from damaging many enemies
@@ -136,15 +131,10 @@ void Engine::sUpdate(float dt){
                             enemy_health.health -= m_registry.getComponent<CDamage>(m_player).damage;
                             player_state.has_hit = true;
 
-                            if(enemy_health.health <= 0.0f){
-                                if(!m_registry.hasComponent<CLifespan>(enemy)){
-                                    m_registry.addComponent(enemy, CLifespan{1.5f});
-                                    m_registry.getComponent<CState>(enemy).current_state = "dead";
-                                    m_registry.getComponent<CState>(enemy).is_locked = false;
-                                    m_sounds.playsound("sfx_enemy_death");
+                        if(m_registry.hasComponent<CState>(enemy)){
+                            m_registry.getComponent<CState>(enemy).damage_flash_timer = 0.05;
+                        }
 
-                                }
-                            }
                             m_sounds.playsound("sfx_enemy_take_damage");
                             break; // save you time you already hiy one (unless you want to hit more in one splash)
                         }

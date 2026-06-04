@@ -92,7 +92,35 @@ void Engine::sRender(){
             // move the sprite to our math coordinates
             rendersprite.setPosition(entity_transform.x, entity_transform.y);
 
-            m_window->draw(rendersprite);
+            // shader injection
+            if(m_registry.hasComponent<CShader>(e)){
+                auto& shader_component = m_registry.getComponent<CShader>(e);
+                sf::Shader* shader = m_assets.getshader(shader_component.name);
+
+                if(shader != nullptr){
+
+                    // amount of trasperancy
+                    float amount = 0.0f;
+                    // check if this entity has a running flash timer
+                    if(m_registry.hasComponent<CState>(e)){
+                        if(m_registry.getComponent<CState>(e).damage_flash_timer > 0.0f){
+                            amount = 0.7f;
+                        }
+                    }
+
+                    //lock it into the gpu
+                    shader->setUniform("flash_amount", amount);
+
+                    // apply shader while drawing
+                    m_window->draw(rendersprite, shader);
+                }else{
+                    // fallback if shader is missing
+                    m_window->draw(rendersprite);
+                }
+            }else{
+                // entities without shaders
+                m_window->draw(rendersprite);
+            }
           
         }
     }
@@ -125,28 +153,28 @@ void Engine::sRender(){
     // ==========================================
     // AI DEBUG RENDERING (Temporary Testing Code)
     // ==========================================
-    for (Entity e : m_registry.ais.getentities()) {
-        // Make sure we only draw for enemies that actually have an active path
-        auto& enemy_ai = m_registry.getComponent<C_AI>(e);
+    // for (Entity e : m_registry.ais.getentities()) {
+    //     // Make sure we only draw for enemies that actually have an active path
+    //     auto& enemy_ai = m_registry.getComponent<C_AI>(e);
         
-        if (enemy_ai.waypoints.empty()) continue;
+    //     if (enemy_ai.waypoints.empty()) continue;
 
-        // Draw a small red box for every node in the current path
-        for (size_t i = enemy_ai.current_waypoint; i < enemy_ai.waypoints.size(); i++) {
-            const CGridPos& node = enemy_ai.waypoints[i];
+    //     // Draw a small red box for every node in the current path
+    //     for (size_t i = enemy_ai.current_waypoint; i < enemy_ai.waypoints.size(); i++) {
+    //         const CGridPos& node = enemy_ai.waypoints[i];
 
-            sf::RectangleShape debugSquare(sf::Vector2f(10.0f, 10.0f));
-            debugSquare.setFillColor(sf::Color::Red);
-            debugSquare.setOrigin(5.0f, 5.0f); // Center the origin
+    //         sf::RectangleShape debugSquare(sf::Vector2f(10.0f, 10.0f));
+    //         debugSquare.setFillColor(sf::Color::Red);
+    //         debugSquare.setOrigin(5.0f, 5.0f); // Center the origin
 
-            // Convert the grid integer back to world float coordinates
-            float world_x = (node.col * 40.0f) + 20.0f; // 40.0f is grid size, 20.0f is half_grid
-            float world_y = (node.row * 40.0f) + 20.0f;
+    //         // Convert the grid integer back to world float coordinates
+    //         float world_x = (node.col * 40.0f) + 20.0f; // 40.0f is grid size, 20.0f is half_grid
+    //         float world_y = (node.row * 40.0f) + 20.0f;
             
-            debugSquare.setPosition(world_x, world_y);
-            m_window->draw(debugSquare);
-        }
-    }
+    //         debugSquare.setPosition(world_x, world_y);
+    //         m_window->draw(debugSquare);
+    //     }
+    // }
 
     //imgui hook render
     ImGui::SFML::Render(*m_window);
@@ -167,12 +195,21 @@ void Engine::sAnimation(float dt){
         auto& entity_sprit = m_registry.getComponent<CSprite>(e);
         auto& entity_velocity = m_registry.getComponent<CVelocity>(e); 
 
-        // locking the states for attacking for example to prevent spamming
+        if(entity_state.damage_flash_timer > 0.0f){
+            entity_state.damage_flash_timer -= dt;
+        }
+
+        // locking the states for attacking for example to prevent spamming and for dying
         if(entity_state.is_locked){
             if(entity_animation.current_frame < entity_animation.frame_count -1){
                 continue;
             } else {
                 entity_state.is_locked = false;
+
+                // if the animation just finished was the death animation show the restart screen 
+                if(entity_state.current_state == "dead" && e == m_player){
+                    m_currentState = GameState::GameOver;
+                }
             }
 
         }       
@@ -181,21 +218,27 @@ void Engine::sAnimation(float dt){
 
         // player logic
         if(e == m_player){
-            new_state = "idle"; // to reset the state if no movement
-            if(entity_velocity.vx > 0.0f || entity_velocity.vx < 0.0f){
-                new_state = "run";
-            } 
-            if(entity_velocity.vy > 0.0f){
-                new_state = "fall";
-            } else if(entity_velocity.vy < 0.0f){
-                new_state = "jump";
+            if(m_registry.getComponent<CHealth>(m_player).health <= 0.0f){
+                new_state = "dead";
             }
-            if(m_registry.hasComponent<CInput>(e)){
-                auto& player_input = m_registry.getComponent<CInput>(e);
-                if(player_input.attack){
-                new_state = "attack";
+            else{
+                new_state = "idle"; // to reset the state if no movement
+                if(entity_velocity.vx > 0.0f || entity_velocity.vx < 0.0f){
+                    new_state = "run";
+                } 
+                if(entity_velocity.vy > 0.0f){
+                    new_state = "fall";
+                } else if(entity_velocity.vy < 0.0f){
+                    new_state = "jump";
+                }
+                if(m_registry.hasComponent<CInput>(e)){
+                    auto& player_input = m_registry.getComponent<CInput>(e);
+                    if(player_input.attack){
+                    new_state = "attack";
+                    }
                 }
             }
+
         }
 
         // enemy logic is drived intirley by sAI() so no need to adjust anything
@@ -228,16 +271,21 @@ void Engine::sAnimation(float dt){
             entity_state.current_state = new_state;
             entity_state.has_hit = false;
             if(e == m_player){
+                if(new_state == "dead"){
+                    entity_sprit = CSprite{"tex_player_dead", 60, 60, 65, 60, 128, 105};
+                    entity_animation = CAnimation{7, .3f, 60, 60, 162};
+                    entity_state.is_locked = true;
+                }
                 if(new_state == "idle"){
                     entity_sprit = CSprite{"tex_player_idle", 66, 57, 38, 43, 75, 75};
                     entity_animation = CAnimation{10, .2f, 66, 57, 162};
                 }
                 if(new_state == "run"){
-                    entity_sprit = CSprite{"tex_player_run", 52, 58, 51, 43, 100, 89};
+                    entity_sprit = CSprite{"tex_player_run", 52, 58, 51, 43, 100, 75};
                     entity_animation = CAnimation{8, .2f, 52, 58, 162};
                 }
                 if(new_state == "fall"){
-                    entity_sprit = CSprite{"tex_player_fall", 58, 35, 45, 66, 89, 95};
+                    entity_sprit = CSprite{"tex_player_fall", 58, 35, 45, 66, 89, 115};
                     entity_animation = CAnimation{3, .2f, 58, 35, 162};
                 }
                 if(new_state == "jump"){
@@ -263,52 +311,51 @@ void Engine::sAnimation(float dt){
                     m_registry.addComponent(attack_effect, CAnimation{5, 0.15f, 11, 15, 48});
                     m_registry.getComponent<CTransform>(attack_effect).facing_left = player_tra.facing_left;
 
-                    m_sounds.playsound("sfx_player_attack");
-
-                    
+                    m_sounds.playsound("sfx_player_attack");                    
                 }
             } else{
 
                 if(!m_registry.getComponent<C_AI>(e).is_flying){
                     if(new_state == "idle" || new_state == "patrol"){
-                        entity_sprit = CSprite{"tex_enemy_idle", 0, 0, 24, 32};
+                        entity_sprit = CSprite{"tex_enemy_idle", 0, 0, 24, 32, 40, 40};
                         entity_animation = CAnimation{11, 0.2f, 0, 0, 24};
                     }
                     if(new_state == "chase"){
-                        entity_sprit = CSprite{"tex_enemy_chase", 0, 0, 22, 33};
+                        entity_sprit = CSprite{"tex_enemy_chase", 0, 0, 22, 33, 36, 41};
                         entity_animation = CAnimation{13, 0.2f, 0, 0, 22};
                     } 
                     if(new_state == "attack"){
-                        entity_sprit = CSprite{"tex_enemy_attack", 0, 0, 43, 37};
+                        entity_sprit = CSprite{"tex_enemy_attack", 0, 0, 43, 37, 71, 46};
                         entity_animation = CAnimation{18, 0.1f, 0, 0, 43};
                         entity_state.is_locked = true;
                     }
                     if(new_state == "dead"){
-                        entity_sprit = CSprite{"tex_enemy_dead", 0, 0, 33, 32};
+                        entity_sprit = CSprite{"tex_enemy_dead", 0, 0, 33, 32, 55, 54};
                         entity_animation = CAnimation{15, 0.1f, 0, 0, 33};
                     }
                 } else {
                     if(new_state == "idle" || new_state == "patrol"){
-                        entity_sprit = CSprite{"flying_enemy_tex", 59, 33, 65, 62};
+                        entity_sprit = CSprite{"flying_enemy_tex", 59, 33, 65, 62, 40, 40};
                         entity_animation =  CAnimation{15, 0.1f, 59, 33, 192};
                     }
                     if(new_state == "chase"){
-                        entity_sprit = CSprite{"flying_enemy_tex", 47, 257, 97,62};
+                        entity_sprit = CSprite{"flying_enemy_tex", 47, 257, 97, 62, 60, 40};
                         entity_animation =  CAnimation{6, 0.2f, 47, 257, 192};
                     } 
                     if(new_state == "attack"){
-                        entity_sprit = CSprite{"flying_enemy_tex", 69, 365, 100, 63};
+                        entity_sprit = CSprite{"flying_enemy_tex", 69, 365, 100, 63, 62, 41};
                         entity_animation =  CAnimation{7, 0.25f, 69, 365, 192};
                         entity_state.is_locked = true;
                     }
                     if(new_state == "dead"){
-                        entity_sprit = CSprite{"flying_enemy_tex", 63, 706, 81, 62};
+                        entity_sprit = CSprite{"flying_enemy_tex", 63, 706, 81, 62, 50, 40};
                         entity_animation =  CAnimation{11, 0.14f, 63, 706, 192};
                     }
  
                 }    
 
             }
+
             // updateEntitySpriteAndAnimation(e, new_state); // Helpful helper function to clean up code (to be added later if i survived this)
             entity_animation.current_frame = 0;
             entity_animation.timer = 0.0f;

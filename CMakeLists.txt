@@ -99,6 +99,7 @@ add_executable(EatMeat
     src/systems/AISystem.cpp
     src/systems/RenderSystem.cpp
     src/systems/MovementSystem.cpp
+    src/systems/HealthSystem.cpp
     # src/core/Registry.cpp
     # src/systems/CombatSystem.cpp
 )

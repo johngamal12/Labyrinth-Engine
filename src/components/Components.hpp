@@ -82,7 +82,7 @@ struct CSprite{
         tex_w = w;
         tex_h = h;
         display_w = offset_w;
-        display_w = offset_h;
+        display_h = offset_h;
     }
 };
 
@@ -114,6 +114,7 @@ struct CState{
     bool is_locked = false;
     bool is_grounded = false;
     float jump_cooldown = 0.0f;
+    float damage_flash_timer = 0.0f; // for shader 
 };
 
 //node for the A*
@@ -150,4 +151,12 @@ enum class GameState{
     MainMenu,
     Playing,
     GameOver
+};
+
+//shaders finally
+struct CShader{
+    std::string name;
+
+    CShader() = default;
+    CShader(const std::string& shader_name) : name(shader_name){}
 };

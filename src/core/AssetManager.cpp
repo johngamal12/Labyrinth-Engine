@@ -1,7 +1,6 @@
 #include "AssetManager.hpp"
 #include <iostream>
 
-
 AssetManager::AssetManager() = default;
 AssetManager::~AssetManager() = default;
 
@@ -42,4 +41,35 @@ sf::Texture& AssetManager::gettexture(const std::string& name){
 
     }
     return pointertotexture->second; //this return the actual texture
+}
+
+
+void AssetManager::addshader(const std::string& name, const std::string& fragment_path){
+    // check if the user's GPU actually supports shaders
+    if(!sf::Shader::isAvailable()){
+        std::cerr<< "shaders are not supported by this GPU";
+        return;
+    }
+    auto shader = std::make_unique<sf::Shader>();
+
+    // sf::Shader::Fragment tells sfml that we are changing pixel color not vertex geometry
+    if(!shader->loadFromFile(fragment_path, sf::Shader::Fragment)){
+        std::cerr<< "error falied to load shader from "<< fragment_path <<"\n";
+        return;
+    }
+
+    m_shaders[name] = std::move(shader);
+    std::cout<< "asste loaded (shader)"<< name<< "->"<< fragment_path<< "\n";
+}
+
+
+// retrun a pointer so we dont actually copy it
+sf::Shader* AssetManager::getshader(const std::string& name){
+    auto pointertoshader = m_shaders.find(name);
+    if(pointertoshader == m_shaders.end()){
+        std::cerr<< "warning shader"<< name<< "not found\n";
+        return nullptr;
+    }
+    // .get() is a builtin function it reaches inside the smart pointer and grabs the raw memory address
+    return pointertoshader->second.get();
 }
